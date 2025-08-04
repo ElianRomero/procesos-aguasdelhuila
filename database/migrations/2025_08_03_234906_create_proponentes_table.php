@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('proponentes', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('ciudad_id')->constrained('ciudades');
+            $table->foreignId('ciiu_id')->constrained('ciiu');
+            $table->string('tipo_identificacion_codigo', 3);
+            $table->foreign('tipo_identificacion_codigo')->references('codigo')->on('tipo_identificaciones');
 
             $table->string('razon_social', 512);
             $table->string('nit', 20)->unique();
@@ -25,8 +30,6 @@ return new class extends Migration
             $table->string('sitio_web', 512)->nullable();
             $table->date('actividad_inicio')->nullable();
             $table->text('observacion')->nullable();
-
-
 
             $table->timestamps();
         });

@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Proponente extends Model
 {
-     use HasFactory;
+    use HasFactory;
 
     protected $fillable = [
         'user_id',
+        'ciudad_id',
+        'ciiu_id',
+        'tipo_identificacion_codigo',
         'razon_social',
         'nit',
         'representante',
@@ -21,21 +24,23 @@ class Proponente extends Model
         'sitio_web',
         'actividad_inicio',
         'observacion',
-        'ciudad_id',
-        'actividad_id',
-        'estado_id',
     ];
 
     // Relaciones
-    public function user()
-    {
+    public function user() {
         return $this->belongsTo(User::class);
     }
 
-    public function ciudad()
-    {
+    public function ciudad() {
         return $this->belongsTo(Ciudad::class);
     }
 
-   
+    public function ciiu() {
+        return $this->belongsTo(Ciiu::class);
+    }
+
+    public function tipoIdentificacion() {
+        return $this->belongsTo(TipoIdentificacion::class, 'tipo_identificacion_codigo', 'codigo');
+    }
+
 }
