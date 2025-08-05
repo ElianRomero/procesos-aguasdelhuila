@@ -2,14 +2,17 @@
 
 @section('content')
     <div class="mt-10">
-        <x-slot name="header">
-            <h2 class="font-semibold text-xl text-gray-800">Completar Información del Proponente</h2>
-        </x-slot>
 
-        <form method="POST" action="{{ route('proponente.store') }}" class="max-w-4xl mx-auto py-6">
+        <form method="POST"
+            action="{{ $proponente ? route('proponente.update', $proponente->id) : route('proponente.store') }}"
+            class="max-w-4xl mx-auto mt-5 py-6 px-8 bg-white rounded-xl shadow-2xl border border-gray-200">
             @csrf
+            @if ($proponente)
+                @method('PUT')
+            @endif
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Razón social -->
                 <div>
                     <label for="razon_social" class="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
@@ -151,8 +154,8 @@
             <!-- Observaciones (una sola columna) -->
             <div class="mt-6">
                 <label for="observacion" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-              <textarea id="observacion" name="observacion" rows="4"
-    class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500">{{ old('observacion', $proponente->observacion ?? '') }}</textarea>
+                <textarea id="observacion" name="observacion" rows="4"
+                    class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500">{{ old('observacion', $proponente->observacion ?? '') }}</textarea>
 
             </div>
 

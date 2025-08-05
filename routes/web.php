@@ -18,8 +18,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 Route::middleware(['auth'])->group(function () {
-    Route::get('/proponente/crear', [ProponenteController::class, 'create'])->name('proponente.create');
-    Route::post('/proponente/guardar', [ProponenteController::class, 'store'])->name('proponente.store');
+Route::post('/proponente', [ProponenteController::class, 'store'])->name('proponente.store');
+Route::put('/proponente/{proponente}', [ProponenteController::class, 'update'])->name('proponente.update');
+// Para mostrar el formulario (crear o editar según usuario)
+Route::get('/proponente/crear', [ProponenteController::class, 'create'])->name('proponente.create');
+
 });
 
 require __DIR__.'/auth.php';

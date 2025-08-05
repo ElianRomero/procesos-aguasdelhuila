@@ -18,12 +18,11 @@ class ProponenteController extends Controller
         $ciius = Ciiu::all();
         $tiposIdentificacion = TipoIdentificacion::all();
 
-        // Buscar si ya existe un proponente para el usuario autenticado
+        // Verificar si ya hay proponente
         $proponente = Proponente::where('user_id', Auth::id())->first();
 
         return view('proponentes.create', compact('departamentos', 'ciius', 'tiposIdentificacion', 'proponente'));
     }
-
 
     public function store(Request $request)
     {
@@ -63,5 +62,41 @@ class ProponenteController extends Controller
         ]);
 
         return redirect()->route('dashboard')->with('success', 'Información registrada correctamente.');
+    }
+    public function update(Request $request, Proponente $proponente)
+    {
+        $request->validate([
+            'ciudad_id' => 'required|exists:ciudades,id',
+            'ciiu_id' => 'required|exists:ciiu,id',
+            'tipo_identificacion_codigo' => 'required|exists:tipo_identificaciones,codigo',
+            'razon_social' => 'required|string|max:255',
+            'nit' => 'required|string|max:50|unique:proponentes,nit,' . $proponente->id,
+            'representante' => 'required|string|max:255',
+            'direccion' => 'nullable|string|max:255',
+            'telefono1' => 'nullable|string|max:20',
+            'telefono2' => 'nullable|string|max:20',
+            'correo' => 'nullable|email|max:255',
+            'sitio_web' => 'nullable|url',
+            'actividad_inicio' => 'nullable|date',
+            'observacion' => 'nullable|string|max:1024',
+        ]);
+
+        $proponente->update($request->only([
+            'ciudad_id',
+            'ciiu_id',
+            'tipo_identificacion_codigo',
+            'razon_social',
+            'nit',
+            'representante',
+            'direccion',
+            'telefono1',
+            'telefono2',
+            'correo',
+            'sitio_web',
+            'actividad_inicio',
+            'observacion'
+        ]));
+
+        return redirect()->route('proponente.create')->with('success', 'Información actualizada correctamente.');
     }
 }
