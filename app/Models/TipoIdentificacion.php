@@ -10,4 +10,5 @@ class TipoIdentificacion extends Model
     use HasFactory;
 
     protected $fillable = ['codigo', 'nombre'];
+        protected $table = 'tipo_identificaciones'; 
 }

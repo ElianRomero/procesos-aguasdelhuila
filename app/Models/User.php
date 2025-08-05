@@ -17,11 +17,12 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-    ];
+   protected $fillable = [
+    'name',
+    'email',
+    'password',
+    'role_id', // 👈 esto es obligatorio para que Laravel lo permita
+];
 
     /**
      * The attributes that should be hidden for serialization.
