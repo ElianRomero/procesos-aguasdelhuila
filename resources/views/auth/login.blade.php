@@ -92,7 +92,7 @@
     </div>
 
     <!-- Botón -->
-    <x-primary-button class="bg-black text-white text-center font-bold justify-center">
+    <x-primary-button class="bg-black text-white text-center font-bold justify-center mt-10">
         Ingresar
     </x-primary-button>
 </form>

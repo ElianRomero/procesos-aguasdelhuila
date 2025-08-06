@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Proceso extends Model
 {
-    protected $table = 'procesos';
+   protected $table = 'procesos';
     protected $primaryKey = 'codigo';
     public $incrementing = false;
     protected $keyType = 'string';
+    public $timestamps = true; // ⬅️ ESTA LÍNEA ES CLAVE
 
     protected $fillable = [
         'codigo',

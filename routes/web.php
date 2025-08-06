@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ProcesoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProponenteController;
 use Illuminate\Support\Facades\Route;
@@ -23,6 +24,10 @@ Route::put('/proponente/{proponente}', [ProponenteController::class, 'update'])-
 // Para mostrar el formulario (crear o editar según usuario)
 Route::get('/proponente/crear', [ProponenteController::class, 'create'])->name('proponente.create');
 
+Route::get('/procesos/crear', [ProcesoController::class, 'create'])->name('procesos.create');
+Route::post('/procesos', [ProcesoController::class, 'store'])->name('procesos.store');
 });
+
+
 
 require __DIR__.'/auth.php';

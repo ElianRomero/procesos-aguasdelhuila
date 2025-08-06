@@ -7,8 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class TipoProceso extends Model
 {
-  
+
     use HasFactory;
 
     protected $fillable = ['codigo', 'nombre'];
+    protected $table = 'tipo_procesos';
 }
