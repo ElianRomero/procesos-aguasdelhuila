@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Proceso extends Model
 {
-   protected $table = 'procesos';
-    protected $primaryKey = 'codigo';
-    public $incrementing = false;
-    protected $keyType = 'string';
-    public $timestamps = true; // ⬅️ ESTA LÍNEA ES CLAVE
+    protected $table = 'procesos';
+
+    protected $primaryKey = 'id';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'codigo',
@@ -24,18 +24,17 @@ class Proceso extends Model
         'modalidad_codigo',
         'estado',
     ];
-
-    // Relaciones
+ protected $casts = [
+        'fecha' => 'date', // 👈 importante
+    ];
     public function tipoProceso()
     {
         return $this->belongsTo(TipoProceso::class, 'tipo_proceso_codigo', 'codigo');
     }
-
     public function estadoContrato()
     {
         return $this->belongsTo(EstadoContrato::class, 'estado_contrato_codigo', 'codigo');
     }
-
     public function tipoContrato()
     {
         return $this->belongsTo(TipoContrato::class, 'tipo_contrato_codigo', 'codigo');

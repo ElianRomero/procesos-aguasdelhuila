@@ -21,11 +21,14 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth'])->group(function () {
 Route::post('/proponente', [ProponenteController::class, 'store'])->name('proponente.store');
 Route::put('/proponente/{proponente}', [ProponenteController::class, 'update'])->name('proponente.update');
-// Para mostrar el formulario (crear o editar según usuario)
+
 Route::get('/proponente/crear', [ProponenteController::class, 'create'])->name('proponente.create');
 
 Route::get('/procesos/crear', [ProcesoController::class, 'create'])->name('procesos.create');
 Route::post('/procesos', [ProcesoController::class, 'store'])->name('procesos.store');
+Route::get('/procesos/{codigo}/edit', [ProcesoController::class, 'edit'])->name('procesos.edit');
+Route::put('/procesos/{codigo}', [ProcesoController::class, 'update'])->name('procesos.update');
+
 });
 
 

@@ -11,16 +11,24 @@ use Illuminate\Support\Facades\DB;
 
 class ProcesoController extends Controller
 {
-    public function create()
+    public function create(Request $request)
     {
         $tiposProceso = TipoProceso::all();
         $estadosContrato = EstadoContrato::all();
         $tiposContrato = TipoContrato::all();
+        $procesos = Proceso::latest('created_at')->get();
 
-        return view('procesos.create', compact('tiposProceso', 'estadosContrato', 'tiposContrato'));
+        $procesoEditar = null;
+        if ($request->has('editar')) {
+            $procesoEditar = Proceso::where('codigo', $request->editar)->first();
+        }
+
+        return view('procesos.create', compact('tiposProceso', 'estadosContrato', 'tiposContrato', 'procesos', 'procesoEditar'));
     }
 
-   public function store(Request $request)
+
+
+    public function store(Request $request)
     {
         $request->validate([
             'codigo' => 'required|string|unique:procesos,codigo',
@@ -58,5 +66,45 @@ class ProcesoController extends Controller
 
         return redirect()->route('procesos.create')->with('success', 'Proceso creado correctamente.');
     }
+    public function edit($codigo)
+    {
+        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+        $tiposProceso = TipoProceso::all();
+        $estadosContrato = EstadoContrato::all();
+        $tiposContrato = TipoContrato::all();
 
+        return view('procesos.edit', compact('proceso', 'tiposProceso', 'estadosContrato', 'tiposContrato'));
+    }
+
+    public function update(Request $request, $codigo)
+    { 
+        dd($request->all());
+        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+
+        $request->validate([
+            'objeto' => 'required|string',
+            'link_secop' => 'nullable|url',
+            'valor' => 'required',
+            'fecha' => 'required|date',
+            'tipo_proceso_codigo' => 'required|exists:tipo_procesos,codigo',
+            'estado_contrato_codigo' => 'required|exists:estado_contratos,codigo',
+            'tipo_contrato_codigo' => 'required|exists:tipo_contratos,codigo',
+            'modalidad_codigo' => 'nullable|string|max:100',
+        ]);
+
+        $valorLimpio = str_replace('.', '', $request->valor);
+
+        $proceso->update([
+            'objeto' => $request->objeto,
+            'link_secop' => $request->link_secop,
+            'valor' => (float) $valorLimpio,
+            'fecha' => $request->fecha,
+            'tipo_proceso_codigo' => $request->tipo_proceso_codigo,
+            'estado_contrato_codigo' => $request->estado_contrato_codigo,
+            'tipo_contrato_codigo' => $request->tipo_contrato_codigo,
+            'modalidad_codigo' => $request->modalidad_codigo,
+        ]);
+
+        return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');
+    }
 }
