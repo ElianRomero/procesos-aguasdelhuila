@@ -24,6 +24,7 @@ class Proceso extends Model
         'tipo_contrato_codigo',
         'modalidad_codigo',
         'estado',
+        'proponente_id',
     ];
 
     protected $casts = [
@@ -42,4 +43,7 @@ class Proceso extends Model
     {
         return $this->belongsTo(TipoContrato::class, 'tipo_contrato_codigo', 'codigo');
     }
+    public function proponente() {
+    return $this->belongsTo(Proponente::class);
+}
 }

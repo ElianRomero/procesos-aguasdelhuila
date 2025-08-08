@@ -8,6 +8,7 @@ use App\Models\TipoProceso;
 use App\Models\EstadoContrato;
 use App\Models\TipoContrato;
 use Illuminate\Support\Facades\DB;
+use App\Models\Proponente;
 
 class ProcesoController extends Controller
 {
@@ -18,13 +19,26 @@ class ProcesoController extends Controller
         $tiposContrato = TipoContrato::all();
         $procesos = Proceso::latest('created_at')->get();
 
+        // 🔹 Cargar proponentes
+        $proponentes = Proponente::select('id', 'razon_social', 'nit')
+            ->orderBy('razon_social')
+            ->get();
+
         $procesoEditar = null;
         if ($request->has('editar')) {
             $procesoEditar = Proceso::where('codigo', $request->editar)->first();
         }
 
-        return view('procesos.create', compact('tiposProceso', 'estadosContrato', 'tiposContrato', 'procesos', 'procesoEditar'));
+        return view('procesos.create', compact(
+            'tiposProceso',
+            'estadosContrato',
+            'tiposContrato',
+            'procesos',
+            'proponentes',
+            'procesoEditar'
+        ));
     }
+
 
 
 
@@ -107,5 +121,18 @@ class ProcesoController extends Controller
         ]);
 
         return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');
+    }
+    public function asignarProponente(Request $request, $codigo)
+    {
+        $request->validate([
+            'proponente_id' => 'nullable|exists:proponentes,id',
+        ]);
+
+        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+        $proceso->update([
+            'proponente_id' => $request->proponente_id, // puede ser null para “quitar”
+        ]);
+
+        return redirect()->route('procesos.create')->with('success', 'Proponente asignado correctamente.');
     }
 }

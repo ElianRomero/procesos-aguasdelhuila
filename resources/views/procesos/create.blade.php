@@ -168,42 +168,88 @@
                 </form>
             </div>
         </div>
-
-        <div class="bg-white rounded-xl shadow-md border overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-200">
-                    <tr class="text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                        <th class="px-4 py-2">Código</th>
-                        <th class="px-4 py-2">Estado</th>
-                        <th class="px-4 py-2">Fecha</th>
-                        <th class="px-4 py-2">Objeto</th>
-                        <th class="px-4 py-2">Valor</th>
-                        <th class="px-4 py-2">Link</th>
-                        <th class="px-4 py-2">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-100">
-                    @foreach ($procesos as $proceso)
-                        <tr class="hover:bg-gray-50 text-sm">
-                            <td class="px-4 py-2">{{ $proceso->codigo }}</td>
-                            <td class="px-4 py-2">{{ $proceso->estado }}</td>
-                            <td class="px-4 py-2">{{ \Carbon\Carbon::parse($proceso->fecha)->format('d/m/Y') }}</td>
-                            <td class="px-4 py-2">{{ Str::limit($proceso->objeto, 60) }}</td>
-                            <td class="px-4 py-2">${{ number_format($proceso->valor, 0, ',', '.') }}</td>
-                            <td class="px-4 py-2">
-                                <a href="{{ $proceso->link_secop }}" class="text-blue-600 underline"
-                                    target="_blank">Ver</a>
-                            </td>
-                            <td class="px-4 py-2">
-                                <a href="{{ route('procesos.create', ['editar' => $proceso->codigo]) }}"
-                                    class="text-indigo-600 hover:underline">Editar</a>
-                            </td>
-
+        <div x-data="{
+            mostrarFormulario: {{ $editando ? 'true' : 'false' }},
+            showProponente: false,
+            codigoSeleccionado: null,
+            openProponenteModal(codigo) {
+                this.codigoSeleccionado = codigo;
+                this.showProponente = true;
+            },
+        }">
+            <div class="bg-white rounded-xl shadow-md border overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-200">
+                        <tr class="text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                            <th class="px-4 py-2">Código</th>
+                            <th class="px-4 py-2">Estado</th>
+                            <th class="px-4 py-2">Fecha</th>
+                            <th class="px-4 py-2">Objeto</th>
+                            <th class="px-4 py-2">Valor</th>
+                            <th class="px-4 py-2">Link</th>
+                            <th class="px-4 py-2">Proponente</th> <!-- 🔹 Nueva columna -->
+                            <th class="px-4 py-2">Acciones</th>
                         </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        @foreach ($procesos as $proceso)
+                            <tr class="hover:bg-gray-50 text-sm">
+                                <td class="px-4 py-2">{{ $proceso->codigo }}</td>
+                                <td class="px-4 py-2">{{ $proceso->estado }}</td>
+                                <td class="px-4 py-2">{{ \Carbon\Carbon::parse($proceso->fecha)->format('d/m/Y') }}</td>
+                                <td class="px-4 py-2">{{ Str::limit($proceso->objeto, 60) }}</td>
+                                <td class="px-4 py-2">${{ number_format($proceso->valor, 0, ',', '.') }}</td>
+                                <td class="px-4 py-2">
+                                    <a href="{{ $proceso->link_secop }}" class="text-blue-600 underline"
+                                        target="_blank">Ver</a>
+                                </td>
+                                <td class="px-4 py-2">
+                                    @if ($proceso->proponente)
+                                        {{ $proceso->proponente->razon_social }} ({{ $proceso->proponente->nit }})
+                                        <button class="ml-2 text-indigo-600 hover:underline"
+                                            @click.prevent="openProponenteModal('{{ $proceso->codigo }}')">Cambiar</button>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                        <button class="ml-2 text-green-600 hover:underline"
+                                            @click.prevent="openProponenteModal('{{ $proceso->codigo }}')">Asignar</button>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-2">
+                                    <a href="{{ route('procesos.create', ['editar' => $proceso->codigo]) }}"
+                                        class="text-indigo-600 hover:underline">Editar</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Modal Asignar Proponente -->
+            <div x-show="showProponente" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">Asignar proponente</h3>
+                    <form :action="`{{ url('/procesos') }}/${codigoSeleccionado}/asignar-proponente`" method="POST">
+                        @csrf
+                        <label class="block font-medium mb-1">Proponente</label>
+                        <select name="proponente_id" class="w-full border-gray-300 rounded mb-4">
+                            <option value="">— Sin proponente —</option>
+                            @foreach ($proponentes as $p)
+                                <option value="{{ $p->id }}">
+                                    {{ $p->razon_social }} ({{ $p->nit }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" class="px-4 py-2 rounded bg-gray-200"
+                                @click="showProponente=false">Cancelar</button>
+                            <button type="submit"
+                                class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-800">Guardar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
+
     </div>
 @endsection
 

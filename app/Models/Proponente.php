@@ -42,5 +42,8 @@ class Proponente extends Model
     public function tipoIdentificacion() {
         return $this->belongsTo(TipoIdentificacion::class, 'tipo_identificacion_codigo', 'codigo');
     }
+public function procesos() {
+    return $this->hasMany(Proceso::class);
+}
 
 }
