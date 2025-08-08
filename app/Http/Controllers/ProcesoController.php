@@ -77,8 +77,7 @@ class ProcesoController extends Controller
     }
 
     public function update(Request $request, $codigo)
-    { 
-        dd($request->all());
+    {
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
 
         $request->validate([
@@ -90,19 +89,21 @@ class ProcesoController extends Controller
             'estado_contrato_codigo' => 'required|exists:estado_contratos,codigo',
             'tipo_contrato_codigo' => 'required|exists:tipo_contratos,codigo',
             'modalidad_codigo' => 'nullable|string|max:100',
+            'estado' => 'required|in:CREADO,VIGENTE,CERRADO', // 👈 solo en update
         ]);
 
-        $valorLimpio = str_replace('.', '', $request->valor);
+        $valorLimpio = (int) preg_replace('/\D/', '', $request->valor);
 
         $proceso->update([
             'objeto' => $request->objeto,
             'link_secop' => $request->link_secop,
-            'valor' => (float) $valorLimpio,
+            'valor' => $valorLimpio,
             'fecha' => $request->fecha,
             'tipo_proceso_codigo' => $request->tipo_proceso_codigo,
             'estado_contrato_codigo' => $request->estado_contrato_codigo,
             'tipo_contrato_codigo' => $request->tipo_contrato_codigo,
             'modalidad_codigo' => $request->modalidad_codigo,
+            'estado' => $request->estado, // 👈 guardar estado
         ]);
 
         return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');

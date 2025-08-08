@@ -8,9 +8,10 @@ class Proceso extends Model
 {
     protected $table = 'procesos';
 
-    protected $primaryKey = 'id';
-    public $incrementing = true;
-    protected $keyType = 'int';
+    // ✅ PK real de tu tabla
+    protected $primaryKey = 'codigo';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
         'codigo',
@@ -24,9 +25,11 @@ class Proceso extends Model
         'modalidad_codigo',
         'estado',
     ];
- protected $casts = [
-        'fecha' => 'date', // 👈 importante
+
+    protected $casts = [
+        'fecha' => 'date',
     ];
+
     public function tipoProceso()
     {
         return $this->belongsTo(TipoProceso::class, 'tipo_proceso_codigo', 'codigo');

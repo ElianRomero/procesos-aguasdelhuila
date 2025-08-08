@@ -140,16 +140,32 @@
                                 value="{{ old('modalidad_codigo', $editando ? $procesoEditar->modalidad_codigo : '') }}"
                                 class="w-full border-gray-300 rounded">
                         </div>
+                        @if ($editando)
+                            <div>
+                                <label class="block font-medium">Estado del Proceso</label>
+                                @php
+                                    $estadoSel = old('estado', $procesoEditar->estado ?? 'CREADO');
+                                @endphp
+                                <select name="estado" class="w-full border-gray-300 rounded" required>
+                                    <option value="CREADO" @selected($estadoSel === 'CREADO')>CREADO</option>
+                                    <option value="VIGENTE" @selected($estadoSel === 'VIGENTE')>VIGENTE</option>
+                                    <option value="CERRADO" @selected($estadoSel === 'CERRADO')>CERRADO</option>
+                                </select>
+                            </div>
+                        @endif
+
                     </div>
 
                     <div class="mt-6">
-                        <button type="submit"
-                            class="bg-{{ $editando ? 'yellow-400' : 'blue' }}-600 text-white px-4 py-2 rounded hover:bg-{{ $editando ? 'yellow-400' : 'blue' }}-800">
+                        @php
+                            $btn = $editando ? 'bg-yellow-600 hover:bg-yellow-800' : 'bg-blue-600 hover:bg-blue-800';
+                        @endphp
+                        <button type="submit" class="{{ $btn }} text-white px-4 py-2 rounded">
                             {{ $editando ? 'Actualizar Proceso' : 'Guardar Proceso' }}
                         </button>
+
                     </div>
                 </form>
-
             </div>
         </div>
 
