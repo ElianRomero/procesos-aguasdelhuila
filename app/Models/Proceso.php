@@ -8,7 +8,7 @@ class Proceso extends Model
 {
     protected $table = 'procesos';
 
-    // ✅ PK real de tu tabla
+    // PK real: 'codigo' (string)
     protected $primaryKey = 'codigo';
     public $incrementing = false;
     protected $keyType = 'string';
@@ -24,13 +24,15 @@ class Proceso extends Model
         'tipo_contrato_codigo',
         'modalidad_codigo',
         'estado',
-        'proponente_id',
+        'proponente_id', // (asignado/ganador si lo usas)
     ];
 
     protected $casts = [
         'fecha' => 'date',
+        // 'valor' => 'integer', // opcional si quieres castearlo
     ];
 
+    // --- Relaciones base por catálogos ---
     public function tipoProceso()
     {
         return $this->belongsTo(TipoProceso::class, 'tipo_proceso_codigo', 'codigo');
@@ -43,7 +45,24 @@ class Proceso extends Model
     {
         return $this->belongsTo(TipoContrato::class, 'tipo_contrato_codigo', 'codigo');
     }
-    public function proponente() {
-    return $this->belongsTo(Proponente::class);
-}
+
+    public function proponente()
+    {
+        return $this->belongsTo(Proponente::class, 'proponente_id', 'id');
+    }
+
+    public function proponentesPostulados()
+    {
+       
+        return $this->belongsToMany(
+            Proponente::class,
+            'postulaciones',
+            'proceso_codigo',   
+            'proponente_id',   
+            'codigo',           
+            'id'                
+        )
+            ->withPivot(['estado', 'observacion', 'postulado_en'])
+            ->withTimestamps();
+    }
 }

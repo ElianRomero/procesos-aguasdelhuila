@@ -17,7 +17,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#"
+                    <a href="{{ route('postulaciones.index') }}"
                         class="flex flex-row items-center h-12 transform hover:translate-x-2 transition-transform ease-in duration-200 text-gray-500 hover:text-gray-800">
                         <span class="inline-flex items-center justify-center h-12 w-12 text-lg text-black">
                             <img src="/image/busqueda.png" width="28" height="28" alt="Citas Icon">

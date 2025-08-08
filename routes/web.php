@@ -4,6 +4,7 @@ use App\Http\Controllers\ProcesoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProponenteController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PostulacionController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -32,6 +33,21 @@ Route::middleware(['auth'])->group(function () {
         '/procesos/{codigo}/asignar-proponente',
         [ProcesoController::class, 'asignarProponente']
     )->name('procesos.asignarProponente');
+    // routes/web.php (dentro de auth)
+    Route::post('/procesos/{codigo}/postular', [PostulacionController::class, 'store'])
+        ->name('postulaciones.store');
+
+    Route::delete('/procesos/{codigo}/postulaciones/{proponente}', [PostulacionController::class, 'destroy'])
+        ->name('postulaciones.destroy');
+
+    // (opcional para admin)
+    Route::post('/procesos/{codigo}/postulaciones/{proponente}/estado', [PostulacionController::class, 'cambiarEstado'])
+        ->name('postulaciones.cambiarEstado');
+        
+        Route::get('/mis-postulaciones', [PostulacionController::class, 'index'])
+    ->name('postulaciones.index')
+    ->middleware('auth');
+
 });
 
 
