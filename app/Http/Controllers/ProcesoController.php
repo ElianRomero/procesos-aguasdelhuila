@@ -122,17 +122,24 @@ class ProcesoController extends Controller
 
         return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');
     }
-    public function asignarProponente(Request $request, $codigo)
-    {
-        $request->validate([
-            'proponente_id' => 'nullable|exists:proponentes,id',
-        ]);
+  public function asignarProponente(Request $request, $codigo)
+{
+    $request->validate([
+        'proponente_id' => 'nullable|exists:proponentes,id',
+    ]);
 
-        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
-        $proceso->update([
-            'proponente_id' => $request->proponente_id, // puede ser null para “quitar”
-        ]);
+    $proceso = Proceso::findOrFail($codigo);
 
-        return redirect()->route('procesos.create')->with('success', 'Proponente asignado correctamente.');
+    // 🔒 Bloquea si NO está VIGENTE
+    if (strtoupper($proceso->estado) !== 'VIGENTE') {
+        return back()->withErrors('Este proceso no está VIGENTE; no es posible asignar proponente.');
     }
+
+    $proceso->update([
+        'proponente_id' => $request->proponente_id, // null = quitar
+    ]);
+
+    return redirect()->route('procesos.create')->with('success', 'Proponente asignado correctamente.');
+}
+
 }

@@ -11,34 +11,36 @@ use Illuminate\Validation\Rule;
 class PostulacionController extends Controller
 
 {
-   public function index()
-{
-    $miProponente = \App\Models\Proponente::where('user_id', auth()->id())->first();
+    public function index()
+    {
+        $miProponente = Proponente::where('user_id', auth()->id())->first();
 
-    if (!$miProponente) {
-        return redirect()->route('proponente.create')
-            ->withErrors('Debes completar tu perfil de Proponente antes de ver los procesos.');
-    }
+        if (!$miProponente) {
+            return redirect()->route('proponente.create')
+                ->withErrors('Debes completar tu perfil de Proponente antes de ver los procesos.');
+        }
 
-    // Procesos vigentes (para postularse)
-    $procesos = \App\Models\Proceso::with([
+        // Procesos vigentes (para postularse)
+        $procesos = Proceso::with([
             // para el botón Postularme/Retirar
             'proponentesPostulados' => fn($q) => $q->where('proponente_id', $miProponente->id),
             // para el modal de detalle
-            'tipoProceso','estadoContrato','tipoContrato'
+            'tipoProceso',
+            'estadoContrato',
+            'tipoContrato'
         ])
-        ->where('estado', 'CREADO')
-        ->orderByDesc('fecha')
-        ->get();
+            ->where('estado', 'CREADO')
+            ->orderByDesc('fecha')
+            ->get();
 
-    // Mis postulaciones (cualquier estado), con relaciones para mostrar detalle
-    $misPostulaciones = \App\Models\Proceso::with(['tipoProceso','estadoContrato','tipoContrato'])
-        ->whereHas('proponentesPostulados', fn($q) => $q->where('proponente_id', $miProponente->id))
-        ->orderByDesc('fecha')
-        ->get();
+        // Mis postulaciones (cualquier estado), con relaciones para mostrar detalle
+        $misPostulaciones = \App\Models\Proceso::with(['tipoProceso', 'estadoContrato', 'tipoContrato'])
+            ->whereHas('proponentesPostulados', fn($q) => $q->where('proponente_id', $miProponente->id))
+            ->orderByDesc('fecha')
+            ->get();
 
-    return view('postulaciones.index', compact('procesos', 'miProponente', 'misPostulaciones'));
-}
+        return view('postulaciones.index', compact('procesos', 'miProponente', 'misPostulaciones'));
+    }
 
 
 

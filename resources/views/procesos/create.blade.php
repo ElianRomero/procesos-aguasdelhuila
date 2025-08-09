@@ -17,7 +17,8 @@
 
 
             <div class="flex items-center gap-4 mb-6">
-                <button @click="mostrarFormulario = true" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-800">
+                <button @click="mostrarFormulario = true"
+                    class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-800">
                     {{ $editando ? 'Editar Proceso' : 'Crear Nuevo Proceso' }}
                 </button>
 
@@ -172,11 +173,15 @@
             mostrarFormulario: {{ $editando ? 'true' : 'false' }},
             showProponente: false,
             codigoSeleccionado: null,
-            openProponenteModal(codigo) {
+            estadoSeleccionado: null,
+            openProponenteModal(codigo, estado) {
+                if (estado !== 'VIGENTE') return; // 🚫 no abre si no está vigente
                 this.codigoSeleccionado = codigo;
+                this.estadoSeleccionado = estado;
                 this.showProponente = true;
             },
         }">
+
             <div class="bg-white rounded-xl shadow-md border overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-200">
@@ -204,16 +209,35 @@
                                         target="_blank">Ver</a>
                                 </td>
                                 <td class="px-4 py-2">
-                                    @if ($proceso->proponente)
-                                        {{ $proceso->proponente->razon_social }} ({{ $proceso->proponente->nit }})
-                                        <button class="ml-2 text-indigo-600 hover:underline"
-                                            @click.prevent="openProponenteModal('{{ $proceso->codigo }}')">Cambiar</button>
+                                    @if ($proceso->estado === 'CREADO')
+                                        <span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-700">
+                                            Proceso en selección
+                                        </span>
                                     @else
-                                        <span class="text-gray-400">—</span>
-                                        <button class="ml-2 text-green-600 hover:underline"
-                                            @click.prevent="openProponenteModal('{{ $proceso->codigo }}')">Asignar</button>
+                                        @if ($proceso->proponente)
+                                            {{-- Botón de ojo para ver detalle --}}
+                                            <a href="{{ route('proponentes.show', $proceso->proponente) }}"
+                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600"
+                                                title="Ver proponente">
+                                                👁️
+                                            </a>
+
+                                            {{-- Botón para cambiar proponente --}}
+                                            <button class="ml-2 text-indigo-600 hover:underline"
+                                                @click.prevent="openProponenteModal('{{ $proceso->codigo }}', '{{ $proceso->estado }}')">
+                                                Cambiar
+                                            </button>
+                                        @else
+                                            <span class="text-gray-400">—</span>
+                                            <button class="ml-2 text-green-600 hover:underline"
+                                                @click.prevent="openProponenteModal('{{ $proceso->codigo }}', '{{ $proceso->estado }}')">
+                                                Asignar
+                                            </button>
+                                        @endif
                                     @endif
                                 </td>
+
+
                                 <td class="px-4 py-2">
                                     <a href="{{ route('procesos.create', ['editar' => $proceso->codigo]) }}"
                                         class="text-indigo-600 hover:underline">Editar</a>
@@ -225,6 +249,7 @@
             </div>
 
             <!-- Modal Asignar Proponente -->
+            <!-- Modal Asignar Proponente -->
             <div x-show="showProponente" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                 <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
                     <h3 class="text-lg font-semibold mb-4">Asignar proponente</h3>
@@ -234,8 +259,7 @@
                         <select name="proponente_id" class="w-full border-gray-300 rounded mb-4">
                             <option value="">— Sin proponente —</option>
                             @foreach ($proponentes as $p)
-                                <option value="{{ $p->id }}">
-                                    {{ $p->razon_social }} ({{ $p->nit }})
+                                <option value="{{ $p->id }}">{{ $p->razon_social }} ({{ $p->nit }})
                                 </option>
                             @endforeach
                         </select>
@@ -248,6 +272,7 @@
                     </form>
                 </div>
             </div>
+
         </div>
 
     </div>

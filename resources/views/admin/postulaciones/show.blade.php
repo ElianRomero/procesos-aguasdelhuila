@@ -4,9 +4,12 @@
     <div class="max-w-7xl mx-auto mt-10 px-4">
         <div class="flex items-center justify-between mb-6 pt-2">
             <h1 class="text-2xl font-bold"></h1>
-            <a href="{{ route('postulaciones.index') }}" class="text-sm px-3 py-2 rounded bg-gray-200 hover:bg-gray-300">
-                ← Volver a postulaciones
-            </a>
+           <button type="button"
+    onclick="history.back()"
+    class="text-sm px-3 py-2 rounded bg-gray-200 hover:bg-gray-300">
+    ← Volver
+</button>
+
         </div>
 
         {{-- Header --}}
