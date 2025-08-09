@@ -1,7 +1,7 @@
 @extends('layouts.reset')
 
 @section('content')
-    <div class="flex items-center justify-center min-h-screen px-4 py-6 bg-gray-100">
+    <div class="flex items-center justify-center min-h-screen px-4 py-6 bg-blue-400">
         <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8 border border-gray-200">
 
             <!-- Logo -->
@@ -60,6 +60,8 @@
                     </x-primary-button>
                 </div>
             </form>
+                    <p class="text-xs text-gray-600 text-center mt-8">&copy; Todos los derechos reservados 2025</p>
+
         </div>
     </div>
 @endsection

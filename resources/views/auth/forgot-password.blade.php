@@ -1,6 +1,6 @@
 @extends('layouts.guest')
 @section('content')
-<div class="flex justify-center items-center mt-20">
+    <div class="flex items-center justify-center min-h-screen px-4 py-6 bg-blue-400">
     <div class="max-w-md w-full p-6 pt-16 bg-white rounded-lg shadow-lg">
         <x-auth-session-status class="mb-4" :status="session('status')" />
         <div class="flex justify-center items-center">
@@ -26,7 +26,7 @@
         <div class="text-center mt-4">
             <p class="text-sm">Volver a <a href="{{ route('login') }}" class="text-cyan-600 underline">Iniciar sesión</a></p>
         </div>
-        <p class="text-xs text-gray-600 text-center mt-8">&copy; 2025</p>
+        <p class="text-xs text-gray-600 text-center mt-8">&copy; Todos los derechos reservados 2025</p>
     </div>
 </div>
 
