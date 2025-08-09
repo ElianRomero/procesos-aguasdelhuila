@@ -22,7 +22,7 @@
                         <span class="inline-flex items-center justify-center h-12 w-12 text-lg text-black">
                             <img src="/image/busqueda.png" width="28" height="28" alt="Citas Icon">
                         </span>
-                        <span class="text-sm font-medium text-black">Mis Postulaciones</span>
+                        <span class="text-sm font-medium text-black">Postulaciones</span>
                     </a>
                 </li>
             @endif

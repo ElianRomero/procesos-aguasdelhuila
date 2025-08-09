@@ -11,25 +11,35 @@ use Illuminate\Validation\Rule;
 class PostulacionController extends Controller
 
 {
-    public function index()
-    {
-        $miProponente = \App\Models\Proponente::where('user_id', auth()->id())->first();
+   public function index()
+{
+    $miProponente = \App\Models\Proponente::where('user_id', auth()->id())->first();
 
-        if (!$miProponente) {
-            return redirect()->route('proponente.create')
-                ->withErrors('Debes completar tu perfil de Proponente antes de ver los procesos.');
-        }
-
-        // Carga procesos vigentes + sólo la postulación del proponente actual (si existe)
-        $procesos = \App\Models\Proceso::with(['proponentesPostulados' => function ($q) use ($miProponente) {
-            $q->where('proponente_id', $miProponente->id);
-        }])
-            ->where('estado', 'VIGENTE')
-            ->orderByDesc('fecha')
-            ->get();
-
-        return view('postulaciones.index', compact('procesos', 'miProponente'));
+    if (!$miProponente) {
+        return redirect()->route('proponente.create')
+            ->withErrors('Debes completar tu perfil de Proponente antes de ver los procesos.');
     }
+
+    // Procesos vigentes (para postularse)
+    $procesos = \App\Models\Proceso::with([
+            // para el botón Postularme/Retirar
+            'proponentesPostulados' => fn($q) => $q->where('proponente_id', $miProponente->id),
+            // para el modal de detalle
+            'tipoProceso','estadoContrato','tipoContrato'
+        ])
+        ->where('estado', 'CREADO')
+        ->orderByDesc('fecha')
+        ->get();
+
+    // Mis postulaciones (cualquier estado), con relaciones para mostrar detalle
+    $misPostulaciones = \App\Models\Proceso::with(['tipoProceso','estadoContrato','tipoContrato'])
+        ->whereHas('proponentesPostulados', fn($q) => $q->where('proponente_id', $miProponente->id))
+        ->orderByDesc('fecha')
+        ->get();
+
+    return view('postulaciones.index', compact('procesos', 'miProponente', 'misPostulaciones'));
+}
+
 
 
     public function store(Request $request, $codigo)
