@@ -17,7 +17,7 @@
 
 
             <div class="flex items-center gap-4 mb-6">
-                <button @click="mostrarFormulario = true" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-800">
+                <button @click="mostrarFormulario = true" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-800">
                     {{ $editando ? 'Editar Proceso' : 'Crear Nuevo Proceso' }}
                 </button>
 

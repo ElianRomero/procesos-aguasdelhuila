@@ -32,7 +32,7 @@ class AuthenticatedSessionController extends Controller
         return redirect()->route('proponente.create');
     }
 
-    return redirect()->intended(route('dashboard', absolute: false));
+    return redirect()->intended(route('procesos.create', absolute: false));
 }
 
 

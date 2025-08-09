@@ -34,7 +34,7 @@
 </head>
 
 <body class="font-sans antialiased">
-    <div class="flex min-h-screen bg-white">
+    <div class="flex min-h-screen bg-blue-400">
         <!-- Sidebar -->
         <div class="hidden lg:flex lg:w-56 lg:fixed lg:h-full lg:bg-white lg:shadow-lg">
             @include('layouts.sidebar')

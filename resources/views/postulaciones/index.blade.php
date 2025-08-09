@@ -138,7 +138,7 @@
                                             action="{{ route('postulaciones.destroy', [$p->codigo, $miProponente->id]) }}"
                                             method="POST" class="inline">
                                             @csrf @method('DELETE')
-                                            <button class="ml-2 px-3 py-1 rounded bg-red-600 text-white hover:bg-red-800">
+                                            <button class="ml-2 px-3 py-1 rounded bg-gray-600 text-white hover:bg-gray-800">
                                                 Retirar
                                             </button>
                                         </form>
