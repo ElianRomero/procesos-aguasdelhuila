@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminPostulacionesController;
 use App\Http\Controllers\ProcesoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProponenteController;
@@ -20,7 +21,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 Route::middleware(['auth', 'can:isProponente'])->group(function () {
-   
+
     Route::get('/proponente/crear', [ProponenteController::class, 'create'])->name('proponente.create');
     Route::post('/proponente', [ProponenteController::class, 'store'])->name('proponente.store');
     Route::put('/proponente/{proponente}', [ProponenteController::class, 'update'])->name('proponente.update');
@@ -31,7 +32,7 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
 });
 
 Route::middleware(['auth', 'can:isAdmin'])->group(function () {
-  
+
     Route::get('/procesos/crear', [ProcesoController::class, 'create'])->name('procesos.create');
     Route::post('/procesos', [ProcesoController::class, 'store'])->name('procesos.store');
     Route::get('/procesos/{codigo}/edit', [ProcesoController::class, 'edit'])->name('procesos.edit');
@@ -39,6 +40,15 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 
     Route::post('/procesos/{codigo}/asignar-proponente', [ProcesoController::class, 'asignarProponente'])->name('procesos.asignarProponente');
     Route::post('/procesos/{codigo}/postulaciones/{proponente}/estado', [PostulacionController::class, 'cambiarEstado'])->name('postulaciones.cambiarEstado');
+
+    Route::get('/admin/postulaciones', [AdminPostulacionesController::class, 'index'])
+        ->name('admin.postulaciones.index');
+
+    Route::post('/procesos/{codigo}/postulaciones/{proponente}/estado', [AdminPostulacionesController::class, 'cambiarEstado'])
+        ->name('postulaciones.cambiarEstado');
+
+    Route::get('/admin/proponentes/{proponente}', [AdminPostulacionesController::class, 'show'])
+        ->name('proponentes.show');
 });
 
 
