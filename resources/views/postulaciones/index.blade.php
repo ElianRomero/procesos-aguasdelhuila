@@ -14,11 +14,25 @@
     <div x-data="{
         showDetalle: false,
         det: {},
+        secopUrl(idOrUrl) {
+            if (!idOrUrl) return '';
+            // Si viene URL completa, extrae numConstancia
+            if (/^https?:\/\//i.test(idOrUrl)) {
+                const m = idOrUrl.match(/numConstancia=([^&]+)/i);
+                return m ?
+                    `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(m[1])}` :
+                    idOrUrl;
+            }
+            // Si viene solo el ID (22-4-13368797)
+            return `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(idOrUrl)}`;
+        },
         openDetalle(p) {
             this.det = p;
+            this.det.secop_url = this.secopUrl(p.link);
             this.showDetalle = true;
         }
     }">
+
 
         @if (session('success'))
             <div class="mb-4 text-green-700 bg-green-100 px-3 py-2 rounded">{{ session('success') }}</div>
@@ -73,17 +87,17 @@
 
                         <button type="button" class="px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-sm"
                             @click="openDetalle(@js([
-                                'codigo' => $mp->codigo,
-                                'objeto' => $mp->objeto,
-                                'valor' => '$' . number_format($mp->valor, 0, ',', '.'),
-                                'fecha' => optional($mp->fecha)->format('d/m/Y'),
-                                'estado' => $mp->estado,
-                                'estadoPostulacion' => $estadoVisual, // 👈 este es el que mostramos
-                                'link' => $mp->link_secop,
-                                'tipo' => $mp->tipoProceso->nombre ?? '',
-                                'estado_contrato' => $mp->estadoContrato->nombre ?? '',
-                                'tipo_contrato' => $mp->tipoContrato->nombre ?? '',
-                                    ]))" title="Ver detalle">
+    'codigo' => $mp->codigo,
+    'objeto' => $mp->objeto,
+    'valor' => '$' . number_format($mp->valor, 0, ',', '.'),
+    'fecha' => optional($mp->fecha)->format('d/m/Y'),
+    'estado' => $mp->estado,
+    'estadoPostulacion' => $estadoVisual, // 👈 este es el que mostramos
+    'link' => $mp->link_secop,
+    'tipo' => $mp->tipoProceso->nombre ?? '',
+    'estado_contrato' => $mp->estadoContrato->nombre ?? '',
+    'tipo_contrato' => $mp->tipoContrato->nombre ?? '',
+]))" title="Ver detalle">
                             <span class="font-medium">{{ $mp->codigo }}</span>
                             <span class="ml-2 text-xs px-2 py-0.5 rounded {{ $badge }}">{{ $estadoVisual }}</span>
                         </button>
@@ -103,7 +117,6 @@
                         <th>Objeto</th>
                         <th>Valor</th>
                         <th>Fecha</th>
-                        <th>Ver</th> {{-- ✅ quitamos “Estado” --}}
                         <th>Acción</th>
                     </tr>
                 </thead>
@@ -114,12 +127,6 @@
                             $estadoPost = $ya ? $p->proponentesPostulados->first()->pivot->estado : null;
                         @endphp
                         <tr>
-                            <td>{{ $p->codigo }}</td>
-                            <td>{{ \Illuminate\Support\Str::limit($p->objeto, 120) }}</td>
-                            <td>${{ number_format($p->valor, 0, ',', '.') }}</td>
-                            <td>{{ $p->fecha?->format('d/m/Y') }}</td>
-
-                            {{-- OJITO DETALLE --}}
                             <td>
                                 <button type="button" class="text-indigo-600 hover:underline"
                                     @click="openDetalle(@js([
@@ -134,16 +141,16 @@
     'tipo_contrato' => $p->tipoContrato->nombre ?? '',
     'modalidad' => $p->modalidad_codigo ?? '',
 ]))">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="inline w-5 h-5" fill="none"
-                                        viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M2.036 12.322a1.012 1.012 0 010-.644C3.423 7.51 7.36 4.5 12 4.5c4.639 0 8.577 3.01 9.964 7.178.07.214.07.43 0 .644C20.577 16.49 16.64 19.5 12 19.5c-4.639 0-8.577-3.01-9.964-7.178z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    Ver
+
+                                    {{ $p->codigo }}
                                 </button>
                             </td>
+                            <td>{{ \Illuminate\Support\Str::limit($p->objeto, 120) }}</td>
+                            <td>${{ number_format($p->valor, 0, ',', '.') }}</td>
+                            <td>{{ $p->fecha?->format('d/m/Y') }}</td>
+
+                            {{-- OJITO DETALLE --}}
+
 
                             {{-- ACCIÓN (postular/retirar) --}}
                             <td>
@@ -174,52 +181,60 @@
 
         {{-- MODAL DETALLE --}}
         <div x-show="showDetalle" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
+            <div class="bg-white rounded-xl shadow-xl w-[96vw] max-w-6xl p-10 md:p-14">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold">Detalle del proceso</h3>
                     <button @click="showDetalle=false" class="text-gray-500 hover:text-gray-700">✕</button>
                 </div>
 
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3 text-sm">
                     <div>
-                        <dt class="font-medium text-gray-600">Código</dt>
+                        <dt class="font-medium text-blue-700 ">Código</dt>
                         <dd x-text="det.codigo"></dd>
                     </div>
                     <div>
-                        <dt class="font-medium text-gray-600">Fecha</dt>
+                        <dt class="font-medium text-blue-700 ">Fecha</dt>
                         <dd x-text="det.fecha"></dd>
                     </div>
-                    <div class="sm:col-span-2">
-                        <dt class="font-medium text-gray-600">Objeto</dt>
+
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <dt class="font-medium text-blue-700 ">Objeto</dt>
                         <dd class="whitespace-pre-line" x-text="det.objeto"></dd>
                     </div>
+
                     <div>
-                        <dt class="font-medium text-gray-600">Valor</dt>
+                        <dt class="font-medium text-blue-700 ">Valor</dt>
                         <dd x-text="det.valor"></dd>
                     </div>
                     <div>
-                        <dt class="font-medium text-gray-600">Tipo de Proceso</dt>
+                        <dt class="font-medium text-blue-700 ">Tipo de Proceso</dt>
                         <dd x-text="det.tipo || '—' "></dd>
                     </div>
                     <div>
-                        <dt class="font-medium text-gray-600">Estado Contrato</dt>
+                        <dt class="font-medium text-blue-700 ">Estado Contrato</dt>
                         <dd x-text="det.estado_contrato || '—' "></dd>
                     </div>
                     <div>
-                        <dt class="font-medium text-gray-600">Tipo de Contrato</dt>
+                        <dt class="font-medium text-blue-700  ">Tipo de Contrato</dt>
                         <dd x-text="det.tipo_contrato || '—' "></dd>
                     </div>
-
                 </dl>
 
-                <div class="mt-4">
-                    <a :href="det.link" target="_blank" class="text-blue-600 hover:underline" x-show="det.link">Ver
-                        SECOP</a>
+
+                <!-- 🔹 Texto legal: ponlo aquí -->
+                <div class="mt-5 p-3 rounded-lg bg-gray-50 border text-[13px] leading-relaxed text-gray-700">
+                    Estimado interesado, en cumplimiento de la Ley 2195 de 2022 Art. 53, mediante el cual se adiciona el
+                    Art. 13 de la Ley 1150 de 2007,
+                    el presente contrato se encuentra publicado en el SECOP II y podrá acceder a través del siguiente botón.
                 </div>
 
-                <div class="mt-6 text-right">
-                    <button class="px-4 py-2 rounded bg-gray-200" @click="showDetalle=false">Cerrar</button>
+                <div class="mt-4" x-show="det.secop_url">
+                    <a :href="det.secop_url" target="_blank" rel="noopener noreferrer"
+                        class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
+                        Ver en SECOP
+                    </a>
                 </div>
+
             </div>
         </div>
     </div>
@@ -236,11 +251,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             const start = () => {
                 if (!window.jQuery || !window.DataTable) return setTimeout(start, 50);
+
                 new DataTable('#tabla-procesos', {
                     responsive: true,
                     order: [
                         [3, 'desc']
-                    ], // Fecha ahora es la columna índice 3
+                    ], // Fecha (col 3)
                     pageLength: 10,
                     language: {
                         url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json'
@@ -251,11 +267,8 @@
                         }, // Valor
                         {
                             targets: 4,
-                            orderable: false
-                        }, // Ver   (índice actualizado)
-                        {
-                            targets: 5,
-                            orderable: false
+                            orderable: false,
+                            searchable: false
                         }, // Acción
                     ],
                 });

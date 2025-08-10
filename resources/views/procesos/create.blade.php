@@ -191,7 +191,6 @@
                             <th class="px-4 py-2">Fecha</th>
                             <th class="px-4 py-2">Objeto</th>
                             <th class="px-4 py-2">Valor</th>
-                            <th class="px-4 py-2">Link</th>
                             <th class="px-4 py-2">Proponente</th> <!-- 🔹 Nueva columna -->
                             <th class="px-4 py-2">Acciones</th>
                         </tr>
@@ -199,15 +198,22 @@
                     <tbody class="bg-white divide-y divide-gray-100">
                         @foreach ($procesos as $proceso)
                             <tr class="hover:bg-gray-50 text-sm">
-                                <td class="px-4 py-2">{{ $proceso->codigo }}</td>
+                                <td class="px-4 py-2">
+                                    <button
+                                        class="btn-detalle px-3 underline py-1.5 rounded-lg  text-blue-600"
+                                        data-codigo="{{ $proceso->codigo }}" data-objeto="{{ e($proceso->objeto) }}"
+                                        data-valor="{{ number_format($proceso->valor, 0, ',', '.') }}"
+                                        data-estado="{{ $proceso->estado }}"
+                                        data-fecha="{{ \Carbon\Carbon::parse($proceso->fecha)->format('Y-m-d') }}"
+                                        data-secop="{{ $proceso->link_secop }}">
+                                        {{ $proceso->codigo }}
+                                    </button>
+                                </td>
                                 <td class="px-4 py-2">{{ $proceso->estado }}</td>
                                 <td class="px-4 py-2">{{ \Carbon\Carbon::parse($proceso->fecha)->format('d/m/Y') }}</td>
                                 <td class="px-4 py-2">{{ Str::limit($proceso->objeto, 60) }}</td>
                                 <td class="px-4 py-2">${{ number_format($proceso->valor, 0, ',', '.') }}</td>
-                                <td class="px-4 py-2">
-                                    <a href="{{ $proceso->link_secop }}" class="text-blue-600 underline"
-                                        target="_blank">Ver</a>
-                                </td>
+
                                 <td class="px-4 py-2">
                                     @if ($proceso->estado === 'CREADO')
                                         <span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-700">
@@ -335,6 +341,72 @@
                 dateFormat: "Y-m-d", // formato que Laravel entiende
                 defaultDate: "{{ old('fecha', $editando ? $procesoEditar->fecha : '') }}",
                 locale: flatpickr.l10ns.es // 🔥 Forzar idioma español
+            });
+        });
+    </script>
+    <script>
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-detalle');
+            if (!btn) return;
+
+            const codigo = btn.dataset.codigo || '';
+            const objeto = btn.dataset.objeto || '';
+            const valor = btn.dataset.valor || '';
+            const estado = btn.dataset.estado || '';
+            const fecha = btn.dataset.fecha || '';
+            const secop = btn.dataset.secop || '';
+
+            const urlSecop =
+                `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(secop)}`;
+
+            Swal.fire({
+                title: `<div class="text-left font-semibold text-gray-800">Proceso ${codigo}</div>`,
+                html: `
+      <div class="text-left">
+        <table class="w-full mb-5 text-sm">
+          <tbody>
+            <tr>
+              <td class="py-1 font-semibold text-gray-500 w-28">Objeto</td>
+              <td class="py-1 text-gray-800">${objeto}</td>
+            </tr>
+            <tr>
+              <td class="py-1 font-semibold text-gray-500">Valor</td>
+              <td class="py-1 text-gray-800">$ ${valor}</td>
+            </tr>
+            <tr>
+              <td class="py-1 font-semibold text-gray-500">Estado</td>
+              <td class="py-1">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs">${estado}</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="py-1 font-semibold text-gray-500">Fecha</td>
+              <td class="py-1 text-gray-800">${fecha}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="p-3 rounded-lg bg-gray-50 border mb-5 text-[13px] leading-relaxed text-gray-700">
+          Estimado interesado, en cumplimiento de la Ley 2195 de 2022 Art. 53, mediante el cual se adiciona el Art. 13 de la Ley 1150 de 2007, 
+          el presente contrato se encuentra publicado en el SECOP II y podrá acceder a través del siguiente botón.
+        </div>
+      </div>
+    `,
+                showConfirmButton: true,
+                confirmButtonText: 'Ver en SECOP',
+                confirmButtonColor: '#16a34a',
+                showCloseButton: true,
+                focusConfirm: false,
+                width: 700,
+                customClass: {
+                    popup: 'rounded-2xl',
+                    confirmButton: 'px-4 py-2 rounded-lg',
+                    closeButton: 'text-gray-500 hover:text-gray-700'
+                }
+            }).then((res) => {
+                if (res.isConfirmed && secop) {
+                    window.open(urlSecop, '_blank', 'noopener,noreferrer');
+                }
             });
         });
     </script>

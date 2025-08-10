@@ -59,16 +59,20 @@ class ProcesoController extends Controller
         // Limpiar y convertir el valor a número (quita puntos de miles)
         $valorLimpio = str_replace('.', '', $request->valor);
 
-        // Verifica que el valor sea numérico
         if (!is_numeric($valorLimpio)) {
             return back()->withErrors(['valor' => 'El valor ingresado no es numérico válido.'])->withInput();
         }
 
-        // Guardar el proceso
+        // 🔹 Normalizar el link SECOP: si es URL, extraer solo el numConstancia
+        $linkSecop = $request->link_secop;
+        if (!empty($linkSecop) && preg_match('/numConstancia=([^&]+)/i', $linkSecop, $m)) {
+            $linkSecop = $m[1]; // Solo el código
+        }
+
         Proceso::create([
             'codigo' => $request->codigo,
             'objeto' => $request->objeto,
-            'link_secop' => $request->link_secop,
+            'link_secop' => $linkSecop,
             'valor' => (float) $valorLimpio,
             'fecha' => $request->fecha,
             'tipo_proceso_codigo' => $request->tipo_proceso_codigo,
@@ -80,6 +84,7 @@ class ProcesoController extends Controller
 
         return redirect()->route('procesos.create')->with('success', 'Proceso creado correctamente.');
     }
+
     public function edit($codigo)
     {
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
@@ -122,24 +127,23 @@ class ProcesoController extends Controller
 
         return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');
     }
-  public function asignarProponente(Request $request, $codigo)
-{
-    $request->validate([
-        'proponente_id' => 'nullable|exists:proponentes,id',
-    ]);
+    public function asignarProponente(Request $request, $codigo)
+    {
+        $request->validate([
+            'proponente_id' => 'nullable|exists:proponentes,id',
+        ]);
 
-    $proceso = Proceso::findOrFail($codigo);
+        $proceso = Proceso::findOrFail($codigo);
 
-    // 🔒 Bloquea si NO está VIGENTE
-    if (strtoupper($proceso->estado) !== 'VIGENTE') {
-        return back()->withErrors('Este proceso no está VIGENTE; no es posible asignar proponente.');
+        // 🔒 Bloquea si NO está VIGENTE
+        if (strtoupper($proceso->estado) !== 'VIGENTE') {
+            return back()->withErrors('Este proceso no está VIGENTE; no es posible asignar proponente.');
+        }
+
+        $proceso->update([
+            'proponente_id' => $request->proponente_id, // null = quitar
+        ]);
+
+        return redirect()->route('procesos.create')->with('success', 'Proponente asignado correctamente.');
     }
-
-    $proceso->update([
-        'proponente_id' => $request->proponente_id, // null = quitar
-    ]);
-
-    return redirect()->route('procesos.create')->with('success', 'Proponente asignado correctamente.');
-}
-
 }
