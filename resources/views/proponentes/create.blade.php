@@ -15,7 +15,8 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Razón social -->
                 <div>
-                    <label for="razon_social" class="block text-sm font-medium text-gray-700 mb-1">Nombre o Razón Social</label>
+                    <label for="razon_social" class="block text-sm font-medium text-gray-700 mb-1">Nombre o Razón
+                        Social</label>
                     <input id="razon_social" name="razon_social" required
                         value="{{ old('razon_social', $proponente->razon_social ?? '') }}"
                         class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm hover:border-gray-400 focus:outline-none focus:ring focus:border-teal-500" />
@@ -149,15 +150,16 @@
                         value="{{ old('actividad_inicio', $proponente->actividad_inicio ?? '') }}"
                         class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500" />
                 </div>
+                <div class="col-span-1 md:col-span-2">
+                    <label for="observacion" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                    <textarea id="observacion" name="observacion" rows="4"
+                        class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500">{{ old('observacion', $proponente->observacion ?? '') }}</textarea>
+
+                </div>
+
             </div>
 
             <!-- Observaciones (una sola columna) -->
-            <div class="mt-6">
-                <label for="observacion" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-                <textarea id="observacion" name="observacion" rows="4"
-                    class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500">{{ old('observacion', $proponente->observacion ?? '') }}</textarea>
-
-            </div>
 
             <!-- Botón -->
             <div class="mt-6">

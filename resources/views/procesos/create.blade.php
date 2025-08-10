@@ -88,12 +88,17 @@
                             <textarea name="objeto" class="w-full border-gray-300 rounded" required>{{ old('objeto', $editando ? $procesoEditar->objeto : '') }}</textarea>
                         </div>
 
-                        <div>
-                            <label class="block font-medium">Link SECOP</label>
-                            <input type="url" name="link_secop"
-                                value="{{ old('link_secop', $editando ? $procesoEditar->link_secop : '') }}"
-                                class="w-full border-gray-300 rounded">
-                        </div>
+                      <div>
+    <label class="block font-medium">Link SECOP</label>
+    <input
+        type="text"
+        name="link_secop"
+        value="{{ old('link_secop', $editando ? $procesoEditar->link_secop : '') }}"
+        placeholder="22-4-13368797 o pega la URL completa de SECOP"
+        class="w-full border-gray-300 rounded"
+    >
+</div>
+
 
 
                         <div>

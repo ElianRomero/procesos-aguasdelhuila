@@ -94,39 +94,50 @@ class ProcesoController extends Controller
 
         return view('procesos.edit', compact('proceso', 'tiposProceso', 'estadosContrato', 'tiposContrato'));
     }
-
     public function update(Request $request, $codigo)
     {
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
 
         $request->validate([
             'objeto' => 'required|string',
-            'link_secop' => 'nullable|url',
+            'link_secop' => 'nullable|string|max:1024', // ← ya no exige URL
             'valor' => 'required',
             'fecha' => 'required|date',
             'tipo_proceso_codigo' => 'required|exists:tipo_procesos,codigo',
             'estado_contrato_codigo' => 'required|exists:estado_contratos,codigo',
             'tipo_contrato_codigo' => 'required|exists:tipo_contratos,codigo',
             'modalidad_codigo' => 'nullable|string|max:100',
-            'estado' => 'required|in:CREADO,VIGENTE,CERRADO', // 👈 solo en update
+            'estado' => 'required|in:CREADO,VIGENTE,CERRADO',
         ]);
 
         $valorLimpio = (int) preg_replace('/\D/', '', $request->valor);
 
+        // 🔹 Normalizar link_secop: si viene URL larga → extrae numConstancia; si viene ID → déjalo
+        $linkSecop = trim((string) $request->link_secop);
+        if ($linkSecop !== '') {
+            if (preg_match('/numConstancia=([^&#]+)/i', $linkSecop, $m)) {
+                $linkSecop = $m[1];
+            } elseif (!preg_match('/^\d{2}-\d{1,2}-\d{6,}$/', $linkSecop)) {
+                // opcional: si no cumple ninguno, puedes anularlo
+                // $linkSecop = null;
+            }
+        }
+
         $proceso->update([
             'objeto' => $request->objeto,
-            'link_secop' => $request->link_secop,
+            'link_secop' => $linkSecop,  // ← guardar el valor limpio
             'valor' => $valorLimpio,
             'fecha' => $request->fecha,
             'tipo_proceso_codigo' => $request->tipo_proceso_codigo,
             'estado_contrato_codigo' => $request->estado_contrato_codigo,
             'tipo_contrato_codigo' => $request->tipo_contrato_codigo,
             'modalidad_codigo' => $request->modalidad_codigo,
-            'estado' => $request->estado, // 👈 guardar estado
+            'estado' => $request->estado,
         ]);
 
         return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');
     }
+
     public function asignarProponente(Request $request, $codigo)
     {
         $request->validate([
