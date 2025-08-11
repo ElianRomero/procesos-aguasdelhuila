@@ -150,15 +150,26 @@
                         value="{{ old('actividad_inicio', $proponente->actividad_inicio ?? '') }}"
                         class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500" />
                 </div>
-                <div class="col-span-1 md:col-span-2">
-                    <label for="observacion" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-                    <textarea id="observacion" name="observacion" rows="4"
-                        class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500">{{ old('observacion', $proponente->observacion ?? '') }}</textarea>
-
+                <!-- URL de Google Drive -->
+                <div>
+                    <label for="google_drive_url" class="block text-sm font-medium text-gray-700 mb-1">
+                        Enlace a Google Drive
+                    </label>
+                    <input id="google_drive_url" name="google_drive_url" type="url"
+                        value="{{ old('google_drive_url', $proponente->google_drive_url ?? '') }}"
+                        placeholder="https://drive.google.com/..."
+                        class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm hover:border-gray-400 focus:outline-none focus:ring focus:border-teal-500" />
                 </div>
 
-            </div>
 
+
+            </div>
+            <div class="col-span-1 md:col-span-2">
+                <label for="observacion" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                <textarea id="observacion" name="observacion" rows="4"
+                    class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring focus:border-teal-500">{{ old('observacion', $proponente->observacion ?? '') }}</textarea>
+
+            </div>
             <!-- Observaciones (una sola columna) -->
 
             <!-- Botón -->

@@ -22,6 +22,7 @@ class Proponente extends Model
         'telefono2',
         'correo',
         'sitio_web',
+        'google_drive_url', 
         'actividad_inicio',
         'observacion',
     ];

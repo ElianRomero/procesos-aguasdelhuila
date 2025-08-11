@@ -4,11 +4,9 @@
     <div class="max-w-7xl mx-auto mt-10 px-4">
         <div class="flex items-center justify-between mb-6 pt-2">
             <h1 class="text-2xl font-bold"></h1>
-           <button type="button"
-    onclick="history.back()"
-    class="text-sm px-3 py-2 rounded bg-gray-200 hover:bg-gray-300">
-    ← Volver
-</button>
+            <button type="button" onclick="history.back()" class="text-sm px-3 py-2 rounded bg-gray-200 hover:bg-gray-300">
+                ← Volver
+            </button>
 
         </div>
 
@@ -83,13 +81,26 @@
                             <div>{{ $proponente->actividad_inicio ?? '—' }}</div>
                         </div>
                     </div>
-
-                    @if ($proponente->observacion)
+                    <div class="grid md:grid-cols-3 gap-4 mt-6">
+                        @if ($proponente->observacion)
+                            <div class="mt-6">
+                                <div class="text-sm text-gray-500 mb-1">Observación</div>
+                                <div class="whitespace-pre-line">{{ $proponente->observacion }}</div>
+                            </div>
+                        @endif
                         <div class="mt-6">
-                            <div class="text-sm text-gray-500 mb-1">Observación</div>
-                            <div class="whitespace-pre-line">{{ $proponente->observacion }}</div>
+                            <div class="text-sm text-gray-500">Enlace Documentación</div>
+                            @if ($proponente->google_drive_url)
+                                <a href="{{ $proponente->google_drive_url }}" target="_blank"
+                                    class="text-blue-600 hover:underline">
+                                    Enlace a Drive
+                                </a>
+                            @else
+                                —
+                            @endif
                         </div>
-                    @endif
+                    </div>
+
                 </div>
 
 
@@ -171,7 +182,7 @@
                                 <td class="px-4 py-2 align-top">
                                     <span class="px-2 py-1 text-xs rounded {{ $color }}">{{ $estado }}</span>
                                 </td>
-                                
+
                             </tr>
                         @empty
                             <tr>

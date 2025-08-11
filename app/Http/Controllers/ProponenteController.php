@@ -38,6 +38,7 @@ class ProponenteController extends Controller
             'telefono2' => 'nullable|string|max:20',
             'correo' => 'nullable|email|max:255',
             'sitio_web' => 'nullable|url',
+            'google_drive_url' => 'nullable|url',
             'actividad_inicio' => 'nullable|date',
             'observacion' => 'nullable|string|max:1024',
         ]);
@@ -56,6 +57,7 @@ class ProponenteController extends Controller
                 'telefono2',
                 'correo',
                 'sitio_web',
+                'google_drive_url',
                 'actividad_inicio',
                 'observacion'
             ])
@@ -77,6 +79,7 @@ class ProponenteController extends Controller
             'telefono2' => 'nullable|string|max:20',
             'correo' => 'nullable|email|max:255',
             'sitio_web' => 'nullable|url',
+            'google_drive_url' => 'nullable|url',
             'actividad_inicio' => 'nullable|date',
             'observacion' => 'nullable|string|max:1024',
         ]);
@@ -93,6 +96,7 @@ class ProponenteController extends Controller
             'telefono2',
             'correo',
             'sitio_web',
+            'google_drive_url',
             'actividad_inicio',
             'observacion'
         ]));
