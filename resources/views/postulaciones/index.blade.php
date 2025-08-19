@@ -26,6 +26,10 @@
             requisitos: [],
             ya: false
         },
+        routeStore(codigo) {
+            return `{{ route('postulaciones.store', ':codigo') }}`.replace(':codigo', encodeURIComponent(codigo));
+        },
+    
         secopUrl(idOrUrl) {
             if (!idOrUrl) return '';
             // Si viene URL completa, intenta extraer numConstancia
@@ -154,9 +158,11 @@
                 <tbody>
                     @foreach ($procesos as $p)
                         @php
-                            $ya = $p->proponentesPostulados->isNotEmpty();
-                            $estadoPost = $ya ? $p->proponentesPostulados->first()->pivot->estado : null;
+                            $pivotActual = $p->proponentesPostulados->firstWhere('id', $miProponente->id);
+                            $ya = (bool) $pivotActual;
+                            $estadoPost = $pivotActual?->pivot?->estado;
                         @endphp
+
                         <tr>
                             <td>
                                 <button type="button" class="text-indigo-600 hover:underline"
@@ -295,21 +301,25 @@
 
 
                 <!-- Acciones -->
+                <!-- Acciones -->
                 <div class="mt-6 flex flex-wrap gap-3 items-center">
-                    <a :href="`{{ url('/postulaciones') }}/${det.codigo}/archivos`"
-                        class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-                        <span x-text="det.ya ? 'Si, Continuar' : 'Continuar a subir documentos'"></span>
-                    </a>
+                    <form :action="routeStore(det.codigo)" method="POST" class="inline"
+                        @submit="$event.target.querySelector('button[type=submit]').disabled = true">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                            <span x-text="det.ya ? 'Sí, Continuar' : 'Postularme y subir documentos'"></span>
+                        </button>
+                    </form>
+
                     <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
                         Cerrar
                     </button>
                 </div>
-
             </div>
         </div>
 
     </div>
-    </div>
+
 
 @endsection
 @section('scripts')

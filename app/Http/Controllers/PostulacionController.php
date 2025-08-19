@@ -50,7 +50,6 @@ class PostulacionController extends Controller
     {
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
 
-        // proponente del usuario actual
         $proponente = Proponente::where('user_id', Auth::id())->first();
         if (!$proponente) {
             return back()->withErrors('Debes completar tu perfil de Proponente antes de postularte.');
@@ -60,20 +59,43 @@ class PostulacionController extends Controller
             'observacion' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Evita duplicados (también hay unique en BD)
-        if ($proceso->proponentesPostulados()->where('proponente_id', $proponente->id)->exists()) {
-            return back()->withErrors('Ya estás postulado a este proceso.');
+        // ✅ Si YA existe, manda directo a archivos (idempotente)
+        if ($proceso->proponentesPostulados()
+            ->where('proponente_id', $proponente->id)
+            ->exists()
+        ) {
+            return redirect("/postulaciones/{$proceso->codigo}/archivos");
         }
 
+        // Crear postulación
         $proceso->proponentesPostulados()->attach($proponente->id, [
             'estado' => 'POSTULADO',
             'observacion' => $request->observacion,
         ]);
 
-        return redirect()
-            ->route('postulaciones.archivos.form', $proceso->codigo)
+        // ✅ Mismo destino que tu link
+        return redirect("/postulaciones/{$proceso->codigo}/archivos")
             ->with('success', 'Postulación enviada. Ahora sube los documentos.');
     }
+    public function archivosForm(string $codigo)
+    {
+        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+        $proponente = Proponente::where('user_id', Auth::id())->first();
+        if (!$proponente) {
+            return redirect()->route('proponente.create')
+                ->withErrors('Debes completar tu perfil de Proponente antes de continuar.');
+        }
+
+        $requisitos = $proceso->requisitos ?? [];
+        $subidos = PostulacionArchivo::where('proceso_codigo', $codigo)
+            ->where('proponente_id', $proponente->id)
+            ->get()
+            ->keyBy('requisito_key');
+
+        // ⬇️ cambia el nombre de la vista a "postulaciones.archivos"
+        return view('postulaciones.archivos', compact('proceso', 'proponente', 'requisitos', 'subidos'));
+    }
+
 
     // (Opcional) Cambiar estado de una postulación (admin)
     public function cambiarEstado(Request $request, $codigo, Proponente $proponente)
@@ -102,24 +124,6 @@ class PostulacionController extends Controller
         return back()->with('success', 'Postulación retirada.');
     }
     // Mostrar form de subida de archivos por requisito
-   public function archivosForm(string $codigo)
-{
-    $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
-    $proponente = Proponente::where('user_id', Auth::id())->first();
-    if (!$proponente) {
-        return redirect()->route('proponente.create')
-            ->withErrors('Debes completar tu perfil de Proponente antes de continuar.');
-    }
-
-    $requisitos = $proceso->requisitos ?? [];
-    $subidos = PostulacionArchivo::where('proceso_codigo', $codigo)
-        ->where('proponente_id', $proponente->id)
-        ->get()
-        ->keyBy('requisito_key');
-
-    // ⬇️ cambia el nombre de la vista a "postulaciones.archivos"
-    return view('postulaciones.archivos', compact('proceso', 'proponente', 'requisitos', 'subidos'));
-}
 
     // Guardar/actualizar PDFs por requisito
     public function archivosStore(Request $request, string $codigo)

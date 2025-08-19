@@ -62,11 +62,12 @@
                     </div>
                 @endforeach
 
-                <div class="flex gap-3 pt-2">
-                    <a href="javascript:history.back()" 
-   class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
-    Volver
-</a>
+               <button type="button"
+        onclick="if (history.length > 1) history.back(); else window.location='{{ route('postulaciones.index') }}';"
+        class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+  Volver
+</button>
+
 
                     <button class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
                         Guardar documentos

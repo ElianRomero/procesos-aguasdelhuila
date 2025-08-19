@@ -27,17 +27,21 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
     Route::put('/proponente/{proponente}', [ProponenteController::class, 'update'])->name('proponente.update');
 
     Route::get('/mis-postulaciones', [PostulacionController::class, 'index'])->name('postulaciones.index');
-    Route::post('/procesos/{codigo}/postular', [PostulacionController::class, 'store'])->name('postulaciones.store');
+    Route::post('/postulaciones/{codigo}', [PostulacionController::class, 'store'])
+        ->name('postulaciones.store');
+
     Route::delete('/procesos/{codigo}/postulaciones/{proponente}', [PostulacionController::class, 'destroy'])->name('postulaciones.destroy');
 
     Route::get('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosForm'])
         ->name('postulaciones.archivos.form');
 
-    
+    Route::delete('/postulaciones/{codigo}/{proponente}', [PostulacionController::class, 'destroy'])
+        ->name('postulaciones.destroy');
+        
     Route::post('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosStore'])
         ->name('postulaciones.archivos.store');
 
-   
+
     Route::get('/postulaciones/{codigo}/archivos/{key}', [PostulacionController::class, 'archivoShow'])
         ->name('postulaciones.archivos.show');
 });
