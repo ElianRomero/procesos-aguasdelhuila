@@ -88,16 +88,13 @@
                             <textarea name="objeto" class="w-full border-gray-300 rounded" required>{{ old('objeto', $editando ? $procesoEditar->objeto : '') }}</textarea>
                         </div>
 
-                      <div>
-    <label class="block font-medium">Link SECOP</label>
-    <input
-        type="text"
-        name="link_secop"
-        value="{{ old('link_secop', $editando ? $procesoEditar->link_secop : '') }}"
-        placeholder="22-4-13368797 o pega la URL completa de SECOP"
-        class="w-full border-gray-300 rounded"
-    >
-</div>
+                        <div>
+                            <label class="block font-medium">Link SECOP</label>
+                            <input type="text" name="link_secop"
+                                value="{{ old('link_secop', $editando ? $procesoEditar->link_secop : '') }}"
+                                placeholder="22-4-13368797 o pega la URL completa de SECOP"
+                                class="w-full border-gray-300 rounded">
+                        </div>
 
 
 
@@ -159,7 +156,7 @@
                                 </select>
                             </div>
                         @endif
-
+                        <x-requisitos-field name="requisitos_json" :initial="old('requisitos_json', $editando ? $procesoEditar->requisitos ?? [] : [])" label="Requisitos del Proceso (PDF)" />
                     </div>
 
                     <div class="mt-6">
@@ -204,8 +201,7 @@
                         @foreach ($procesos as $proceso)
                             <tr class="hover:bg-gray-50 text-sm">
                                 <td class="px-4 py-2">
-                                    <button
-                                        class="btn-detalle px-3 underline py-1.5 rounded-lg  text-blue-600"
+                                    <button class="btn-detalle px-3 underline py-1.5 rounded-lg  text-blue-600"
                                         data-codigo="{{ $proceso->codigo }}" data-objeto="{{ e($proceso->objeto) }}"
                                         data-valor="{{ number_format($proceso->valor, 0, ',', '.') }}"
                                         data-estado="{{ $proceso->estado }}"
@@ -247,8 +243,6 @@
                                         @endif
                                     @endif
                                 </td>
-
-
                                 <td class="px-4 py-2">
                                     <a href="{{ route('procesos.create', ['editar' => $proceso->codigo]) }}"
                                         class="text-indigo-600 hover:underline">Editar</a>

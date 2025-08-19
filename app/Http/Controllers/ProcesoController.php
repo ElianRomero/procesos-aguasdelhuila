@@ -9,6 +9,9 @@ use App\Models\EstadoContrato;
 use App\Models\TipoContrato;
 use Illuminate\Support\Facades\DB;
 use App\Models\Proponente;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+
 
 class ProcesoController extends Controller
 {
@@ -54,20 +57,23 @@ class ProcesoController extends Controller
             'estado_contrato_codigo' => 'required|exists:estado_contratos,codigo',
             'tipo_contrato_codigo' => 'required|exists:tipo_contratos,codigo',
             'modalidad_codigo' => 'nullable|string|max:100',
+            'requisitos_json' => 'nullable|string',
         ]);
 
-        // Limpiar y convertir el valor a número (quita puntos de miles)
+        // limpiar valor
         $valorLimpio = str_replace('.', '', $request->valor);
-
         if (!is_numeric($valorLimpio)) {
             return back()->withErrors(['valor' => 'El valor ingresado no es numérico válido.'])->withInput();
         }
 
-        // 🔹 Normalizar el link SECOP: si es URL, extraer solo el numConstancia
+        // normalizar SECOP
         $linkSecop = $request->link_secop;
         if (!empty($linkSecop) && preg_match('/numConstancia=([^&]+)/i', $linkSecop, $m)) {
-            $linkSecop = $m[1]; // Solo el código
+            $linkSecop = $m[1];
         }
+
+        // parsear requisitos con helper
+        $requisitos = $this->parseRequisitos($request->input('requisitos_json'));
 
         Proceso::create([
             'codigo' => $request->codigo,
@@ -80,27 +86,49 @@ class ProcesoController extends Controller
             'tipo_contrato_codigo' => $request->tipo_contrato_codigo,
             'modalidad_codigo' => $request->modalidad_codigo,
             'estado' => 'CREADO',
+            'requisitos' => $requisitos,
         ]);
 
         return redirect()->route('procesos.create')->with('success', 'Proceso creado correctamente.');
     }
 
-    public function edit($codigo)
-    {
-        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
-        $tiposProceso = TipoProceso::all();
-        $estadosContrato = EstadoContrato::all();
-        $tiposContrato = TipoContrato::all();
 
-        return view('procesos.edit', compact('proceso', 'tiposProceso', 'estadosContrato', 'tiposContrato'));
-    }
-    public function update(Request $request, $codigo)
+    public function edit(string $codigo)
     {
+        $procesoEditar = Proceso::where('codigo', $codigo)->firstOrFail();
+
+        // Carga catálogos
+        $tiposProceso     = TipoProceso::all();
+        $estadosContrato  = EstadoContrato::all();
+        $tiposContrato    = TipoContrato::all();
+
+        // 👇 ESTOS FALTABAN
+        $procesos = Proceso::latest('created_at')->get();
+        $proponentes = Proponente::select('id', 'razon_social', 'nit')
+            ->orderBy('razon_social')
+            ->get();
+
+        $editando = true;
+
+        return view('procesos.create', compact(
+            'editando',
+            'procesoEditar',
+            'tiposProceso',
+            'estadosContrato',
+            'tiposContrato',
+            'procesos',       // 👈
+            'proponentes'     // 👈
+        ));
+    }
+
+    public function update(Request $request, string $codigo)
+    {
+        // Carga el modelo por codigo (si no existe 404)
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
 
         $request->validate([
             'objeto' => 'required|string',
-            'link_secop' => 'nullable|string|max:1024', // ← ya no exige URL
+            'link_secop' => 'nullable|url',
             'valor' => 'required',
             'fecha' => 'required|date',
             'tipo_proceso_codigo' => 'required|exists:tipo_procesos,codigo',
@@ -108,35 +136,76 @@ class ProcesoController extends Controller
             'tipo_contrato_codigo' => 'required|exists:tipo_contratos,codigo',
             'modalidad_codigo' => 'nullable|string|max:100',
             'estado' => 'required|in:CREADO,VIGENTE,CERRADO',
+            'requisitos_json' => 'nullable|string',
         ]);
 
-        $valorLimpio = (int) preg_replace('/\D/', '', $request->valor);
-
-        // 🔹 Normalizar link_secop: si viene URL larga → extrae numConstancia; si viene ID → déjalo
-        $linkSecop = trim((string) $request->link_secop);
-        if ($linkSecop !== '') {
-            if (preg_match('/numConstancia=([^&#]+)/i', $linkSecop, $m)) {
-                $linkSecop = $m[1];
-            } elseif (!preg_match('/^\d{2}-\d{1,2}-\d{6,}$/', $linkSecop)) {
-                // opcional: si no cumple ninguno, puedes anularlo
-                // $linkSecop = null;
-            }
+        // Valor
+        $valorLimpio = str_replace('.', '', $request->valor);
+        if (!is_numeric($valorLimpio)) {
+            return back()->withErrors(['valor' => 'El valor ingresado no es numérico válido.'])->withInput();
         }
 
-        $proceso->update([
-            'objeto' => $request->objeto,
-            'link_secop' => $linkSecop,  // ← guardar el valor limpio
-            'valor' => $valorLimpio,
-            'fecha' => $request->fecha,
-            'tipo_proceso_codigo' => $request->tipo_proceso_codigo,
-            'estado_contrato_codigo' => $request->estado_contrato_codigo,
-            'tipo_contrato_codigo' => $request->tipo_contrato_codigo,
-            'modalidad_codigo' => $request->modalidad_codigo,
-            'estado' => $request->estado,
-        ]);
+        // Link SECOP → si viene URL larga, extrae numConstancia
+        $linkSecop = $request->link_secop;
+        if (!empty($linkSecop) && preg_match('/numConstancia=([^&]+)/i', $linkSecop, $m)) {
+            $linkSecop = $m[1];
+        }
 
-        return redirect()->route('procesos.create')->with('success', 'Proceso actualizado correctamente.');
+        // Atributos base
+        $proceso->objeto = $request->objeto;
+        $proceso->link_secop = $linkSecop;
+        $proceso->valor = (float) $valorLimpio;
+        $proceso->fecha = $request->fecha;
+        $proceso->tipo_proceso_codigo = $request->tipo_proceso_codigo;
+        $proceso->estado_contrato_codigo = $request->estado_contrato_codigo;
+        $proceso->tipo_contrato_codigo = $request->tipo_contrato_codigo;
+        $proceso->modalidad_codigo = $request->modalidad_codigo;
+        $proceso->estado = $request->estado;
+
+        // Requisitos (si vienen) → el cast 'array' se encarga del JSON
+        if ($request->filled('requisitos_json')) {
+            $proceso->requisitos = $this->parseRequisitos($request->input('requisitos_json'));
+        }
+
+        $proceso->save();
+
+        // Redirect correcto: pasa 'codigo' explícitamente
+        return redirect()
+            ->route('procesos.edit', ['codigo' => $proceso->codigo])
+            ->with('success', 'Proceso actualizado correctamente.');
     }
+
+
+
+
+    private function parseRequisitos(?string $json): array
+    {
+        if (!$json) return [];
+        $data = json_decode($json, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) return [];
+
+        $out = [];
+        foreach ($data as $r) {
+            if (is_string($r)) {
+                $name = trim($r);
+                $key  = Str::slug($name);
+            } else {
+                $name = trim((string)($r['name'] ?? ''));
+                $key  = preg_replace('/[^a-z0-9\-]/', '', strtolower((string)($r['key'] ?? '')));
+            }
+            if ($name === '' || $key === '') continue;
+
+            $out[] = [
+                'name' => $name,
+                'key'  => $key,
+                // implícito: solo PDF; validaremos en uploads: mimes:pdf|max:10240
+            ];
+        }
+        return $out;
+    }
+
+
+
 
     public function asignarProponente(Request $request, $codigo)
     {

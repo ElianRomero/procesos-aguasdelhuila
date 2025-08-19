@@ -24,15 +24,15 @@ class Proceso extends Model
         'tipo_contrato_codigo',
         'modalidad_codigo',
         'estado',
-        'proponente_id', // (asignado/ganador si lo usas)
+        'proponente_id',
+        'requisitos',
     ];
 
     protected $casts = [
         'fecha' => 'date',
-        // 'valor' => 'integer', // opcional si quieres castearlo
+        'requisitos' => 'array',
     ];
 
-    // --- Relaciones base por catálogos ---
     public function tipoProceso()
     {
         return $this->belongsTo(TipoProceso::class, 'tipo_proceso_codigo', 'codigo');
@@ -53,16 +53,21 @@ class Proceso extends Model
 
     public function proponentesPostulados()
     {
-       
+
         return $this->belongsToMany(
             Proponente::class,
             'postulaciones',
-            'proceso_codigo',   
-            'proponente_id',   
-            'codigo',           
-            'id'                
+            'proceso_codigo',
+            'proponente_id',
+            'codigo',
+            'id'
         )
             ->withPivot(['estado', 'observacion', 'postulado_en'])
             ->withTimestamps();
+    }
+    // App\Models\Proceso.php
+    public function getRouteKeyName(): string
+    {
+        return 'codigo';
     }
 }

@@ -48,7 +48,7 @@
         {{-- MIS POSTULACIONES --}}
         <div class="bg-white shadow rounded-lg overflow-hidden p-4 mt-16 mb-6">
             <div class="flex items-center justify-between mb-3">
-                <h3 class="text-lg font-semibold">Mis postulaciones</h3>
+                <h3 class="text-lg font-semibold">Mis Oportunidades Activas</h3>
                 <span class="text-sm text-gray-500">{{ $misPostulaciones->count() }} en total</span>
             </div>
 
@@ -63,6 +63,7 @@
                             $estadoPivot = $pivot?->estado ?? 'POSTULADO';
 
                             // Si el proceso ya está cerrado (estado global en la tabla procesos)
+                            // Si el proceso ya está cerrado (estado global en la tabla procesos)
                             if (strtoupper($mp->estado) === 'CERRADO') {
                                 $estadoVisual = 'CERRADO';
                             }
@@ -75,14 +76,20 @@
                                 $estadoVisual = $estadoPivot;
                             }
 
+                            // 🔹 Sobrescribir visualmente POSTULADO por INTERESADO
+                            if ($estadoVisual === 'POSTULADO') {
+                                $estadoVisual = 'INTERESADO';
+                            }
+
                             // Colores según estado visual
                             $badge = match ($estadoVisual) {
                                 'ASIGNADO' => 'bg-green-100 text-green-700',
                                 'CERRADO' => 'bg-gray-300 text-gray-700',
                                 'ACEPTADA', 'ACEPTADO' => 'bg-green-100 text-green-700',
                                 'RECHAZADA', 'RECHAZADO' => 'bg-red-100 text-red-700',
-                                default => 'bg-blue-100 text-blue-700', // POSTULADO u otros
+                                default => 'bg-blue-100 text-blue-700', // INTERESADO u otros
                             };
+
                         @endphp
 
                         <button type="button" class="px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-sm"
@@ -159,16 +166,15 @@
                                         class="inline">
                                         @csrf
                                         <button class="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-800">
-                                            Postularme
+                                            Interesado
                                         </button>
                                     </form>
                                 @else
-                                    <span class="text-xs px-2 py-1 rounded bg-blue-100">{{ $estadoPost }}</span>
                                     <form action="{{ route('postulaciones.destroy', [$p->codigo, $miProponente->id]) }}"
                                         method="POST" class="inline">
                                         @csrf @method('DELETE')
                                         <button class="ml-2 px-3 py-1 rounded bg-gray-600 text-white hover:bg-gray-800">
-                                            Retirar
+                                            Desinteresado
                                         </button>
                                     </form>
                                 @endif
