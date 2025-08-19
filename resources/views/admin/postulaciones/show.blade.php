@@ -88,17 +88,113 @@
                                 <div class="whitespace-pre-line">{{ $proponente->observacion }}</div>
                             </div>
                         @endif
-                        <div class="mt-6">
-                            <div class="text-sm text-gray-500">Enlace Documentación</div>
-                            @if ($proponente->google_drive_url)
-                                <a href="{{ $proponente->google_drive_url }}" target="_blank"
-                                    class="text-blue-600 hover:underline">
-                                    Enlace a Drive
-                                </a>
-                            @else
-                                —
-                            @endif
+                        @php $procesoCodigo = request('proceso'); @endphp
+
+                        <div x-data="docsModal()" class="mt-6">
+                            <div class="text-sm text-gray-500">Documentos del proceso</div>
+
+                            <button type="button"
+                                @click="load('{{ route('proponentes.documentos', $proponente) }}?proceso={{ $procesoCodigo }}')"
+                                class="text-blue-600 hover:underline">
+                                Ver documentos
+                            </button>
+
+                         
+                            <!-- Modal -->
+                            <div x-show="open" x-cloak
+                                class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                                <div
+                                    class="bg-white rounded-xl shadow-xl w-[96vw] max-w-4xl max-h-[80vh] p-5 overflow-y-auto">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h3 class="text-lg font-semibold">
+                                            Documentos — Proceso {{ $procesoCodigo ?: 'N/A' }}
+                                        </h3>
+                                        <button @click="open=false" class="text-gray-500 hover:text-gray-700">✕</button>
+                                    </div>
+
+                                    <template x-if="loading">
+                                        <div class="p-4 text-sm text-gray-500">Cargando...</div>
+                                    </template>
+                                    <template x-if="error">
+                                        <div class="p-4 text-sm text-red-600" x-text="error"></div>
+                                    </template>
+                                    <template x-if="!loading && !error && items.length === 0">
+                                        <div class="p-4 text-sm text-gray-500">No hay documentos para este proceso.</div>
+                                    </template>
+
+                                    <template x-if="!loading && !error && items.length">
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full text-sm">
+                                                <thead>
+                                                    <tr class="bg-gray-50 text-left">
+                                                        <th class="px-3 py-2">Requisito</th>
+                                                        <th class="px-3 py-2">Archivo</th>
+                                                        <th class="px-3 py-2">Fecha</th>
+                                                        <th class="px-3 py-2">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <template x-for="f in items" :key="f.id">
+                                                        <tr class="border-t">
+                                                            <td class="px-3 py-2" x-text="f.req || '—'"></td>
+                                                            <td class="px-3 py-2 truncate max-w-[300px]"
+                                                                :title="f.name" x-text="f.name"></td>
+                                                            <td class="px-3 py-2" x-text="f.fecha"></td>
+                                                            <td class="px-3 py-2">
+                                                                <template x-if="f.url">
+                                                                    <a :href="f.url" target="_blank"
+                                                                        class="px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs">
+                                                                        Ver
+                                                                    </a>
+                                                                </template>
+                                                            </td>
+                                                        </tr>
+                                                    </template>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </template>
+
+                                    <div class="text-right mt-4">
+                                        <button @click="open=false"
+                                            class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">Cerrar</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <script>
+                            function docsModal() {
+                                return {
+                                    open: false,
+                                    loading: false,
+                                    error: null,
+                                    items: [],
+                                    async load(url) {
+                                        this.open = true;
+                                        this.loading = true;
+                                        this.error = null;
+                                        this.items = [];
+                                        try {
+                                            const res = await fetch(url, {
+                                                headers: {
+                                                    'X-Requested-With': 'XMLHttpRequest'
+                                                }
+                                            });
+                                            if (!res.ok) throw new Error('Error ' + res.status);
+                                            const data = await res.json();
+                                            // cuando viene ?proceso=... el controlador devuelve { items: [...] }
+                                            this.items = data.items || [];
+                                        } catch (e) {
+                                            this.error = e.message || 'No se pudo cargar.';
+                                        } finally {
+                                            this.loading = false;
+                                        }
+                                    }
+                                }
+                            }
+                        </script>
+
                     </div>
 
                 </div>
@@ -180,7 +276,8 @@
                                     <div class="text-sm">{{ $proc->objeto }}</div>
                                 </td>
                                 <td class="px-4 py-2 align-top">
-                                    <span class="px-2 py-1 text-xs rounded {{ $color }}">{{ $estado }}</span>
+                                    <span
+                                        class="px-2 py-1 text-xs rounded {{ $color }}">{{ $estado }}</span>
                                 </td>
 
                             </tr>

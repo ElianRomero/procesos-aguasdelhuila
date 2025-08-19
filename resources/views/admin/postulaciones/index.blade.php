@@ -2,8 +2,14 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="max-w-7xl mx-auto mt-10 px-4" x-data="{ showDetalle: false, det: {}, openDetalle(p) { this.det = p;
-            this.showDetalle = true } }">
+    <div class="max-w-7xl mx-auto mt-10 px-4" x-data="{
+        showDetalle: false,
+        det: {},
+        openDetalle(p) {
+            this.det = p;
+            this.showDetalle = true
+        }
+    }">
 
         <h1 class="text-2xl font-bold mb-6"></h1>
 
@@ -64,43 +70,55 @@
                             @php
                                 $prop = $p->proponente;
                                 $proc = $p->proceso;
+                                $estado = strtoupper($p->estado ?? 'ENVIADA');
+                                $color =
+                                    [
+                                        'ENVIADA' => 'bg-blue-100 text-blue-700',
+                                        'ACEPTADA' => 'bg-green-100 text-green-700',
+                                        'RECHAZADA' => 'bg-red-100 text-red-700',
+                                    ][$estado] ?? 'bg-gray-100 text-gray-700';
                             @endphp
+
                             <tr class="border-t">
                                 <td class="px-4 py-3">
                                     <div class="font-semibold">{{ $prop->razon_social ?? '—' }}</div>
                                     <div class="text-xs text-gray-500">NIT: {{ $prop->nit ?? '—' }}</div>
                                 </td>
+
                                 <td class="px-4 py-3 text-sm">
-                                    <div>{{ $prop->telefono1 ?? '—' }} {{ $prop->telefono2 ? ' / ' . $prop->telefono2 : '' }}
+                                    <div>{{ $prop->telefono1 ?? '—' }}{{ $prop->telefono2 ? ' / ' . $prop->telefono2 : '' }}
                                     </div>
                                     <div class="text-xs text-gray-500">{{ $prop->correo ?? '—' }}</div>
                                 </td>
+
                                 <td class="px-4 py-3 text-sm">
-                                    <div class="font-medium">#{{ $proc->codigo }}</div>
-                                    <div class="text-xs text-gray-500 line-clamp-2">{{ $proc->objeto }}</div>
+                                    <div class="font-medium">#{{ $proc->codigo ?? '—' }}</div>
+                                    <div class="text-xs text-gray-500 line-clamp-2">{{ $proc->objeto ?? '—' }}</div>
                                 </td>
+
                                 <td class="px-4 py-3 text-sm">
                                     {{ optional($p->fecha_postulacion)->format('Y-m-d') ?? $p->created_at->format('Y-m-d') }}
                                 </td>
+
                                 <td class="px-4 py-3">
-                                    @php
-                                        $estado = strtoupper($p->estado ?? 'ENVIADA');
-                                        $color =
-                                            [
-                                                'ENVIADA' => 'bg-blue-100 text-blue-700',
-                                                'ACEPTADA' => 'bg-green-100 text-green-700',
-                                                'RECHAZADA' => 'bg-red-100 text-red-700',
-                                            ][$estado] ?? 'bg-gray-100 text-gray-700';
-                                    @endphp
                                     <span class="px-2 py-1 text-xs rounded {{ $color }}">{{ $estado }}</span>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <a href="{{ route('proponentes.show', $prop) }}"
-                                        class="text-sm bg-gray-800 text-white px-3 py-2 rounded hover:bg-black inline-block">
-                                        Ver detalle
-                                    </a>
-                                </td>
 
+                                <td class="px-4 py-3">
+                                    @if ($prop && $proc)
+                                        {{-- Pasa el proceso como query ?proceso=CODIGO --}}
+                                        <a href="{{ route('proponentes.show', ['proponente' => $prop, 'proceso' => $proc->codigo]) }}"
+                                            class="text-sm bg-gray-800 text-white px-3 py-2 rounded hover:bg-black inline-block">
+                                            Ver detalle
+                                        </a>
+                                    @else
+                                        <button
+                                            class="text-sm px-3 py-2 rounded bg-gray-200 text-gray-500 cursor-not-allowed"
+                                            disabled>
+                                            Ver detalle
+                                        </button>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
@@ -114,7 +132,7 @@
             </div>
         </div>
 
-        
+
 
     </div>
 @endsection

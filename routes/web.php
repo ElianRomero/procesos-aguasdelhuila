@@ -37,7 +37,7 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
 
     Route::delete('/postulaciones/{codigo}/{proponente}', [PostulacionController::class, 'destroy'])
         ->name('postulaciones.destroy');
-        
+
     Route::post('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosStore'])
         ->name('postulaciones.archivos.store');
 
@@ -61,6 +61,10 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 
     Route::post('/procesos/{codigo}/postulaciones/{proponente}/estado', [AdminPostulacionesController::class, 'cambiarEstado'])
         ->name('postulaciones.cambiarEstado');
+
+    Route::get('/admin/proponentes/{proponente}/documentos', [AdminPostulacionesController::class, 'documentos'])
+        ->name('proponentes.documentos');
+
 
     Route::get('/admin/proponentes/{proponente}', [AdminPostulacionesController::class, 'show'])
         ->name('proponentes.show');

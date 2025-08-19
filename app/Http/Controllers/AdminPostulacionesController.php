@@ -7,16 +7,18 @@ use App\Models\Postulacion;
 use App\Models\Proceso;
 use App\Models\Proponente;
 use Illuminate\Support\Facades\DB;
+use App\Models\PostulacionArchivo;
+use Illuminate\Support\Facades\Storage;
 
 class AdminPostulacionesController extends Controller
 {
     public function index()
     {
         $postulaciones = Postulacion::with([
-                'proponente.ciudad',
-                'proponente.ciiu',
-                'proceso',
-            ])
+            'proponente.ciudad',
+            'proponente.ciiu',
+            'proceso',
+        ])
             ->get(); // 🔹 sin orden por fecha_postulacion
 
         return view('admin.postulaciones.index', compact('postulaciones'));
@@ -49,29 +51,85 @@ class AdminPostulacionesController extends Controller
 
         return back()->with('success', 'Estado de la postulación actualizado correctamente.');
     }
-     public function show(Proponente $proponente)
+    public function show(Proponente $proponente)
     {
         $proponente->load([
             'ciudad',
             'ciiu',
             'tipoIdentificacion',
-            // postulaciones con su proceso relacionado
             'procesosPostulados' => function ($q) {
-                $q->with('tipoProceso') // por si agregas inversa en Proceso
-                  ->withPivot(['estado', 'observacion', 'created_at'])
-                  ->orderByPivot('created_at', 'desc');
+                $q->with('tipoProceso')
+                    ->withPivot(['estado', 'observacion', 'created_at'])
+                    ->orderByPivot('created_at', 'desc');
             },
-            'procesosAsignados', // ganador/asignado si lo usas
+            'procesosAsignados',
         ]);
 
-        // Totales rápidos por estado de postulación
         $estadisticas = [
-            'total'     => $proponente->procesosPostulados->count(),
-            'enviadas'  => $proponente->procesosPostulados->where('pivot.estado', 'ENVIADA')->count(),
-            'aceptadas' => $proponente->procesosPostulados->where('pivot.estado', 'ACEPTADA')->count(),
-            'rechazadas'=> $proponente->procesosPostulados->where('pivot.estado', 'RECHAZADA')->count(),
+            'total'      => $proponente->procesosPostulados->count(),
+            'enviadas'   => $proponente->procesosPostulados->where('pivot.estado', 'ENVIADA')->count(),
+            'aceptadas'  => $proponente->procesosPostulados->where('pivot.estado', 'ACEPTADA')->count(),
+            'rechazadas' => $proponente->procesosPostulados->where('pivot.estado', 'RECHAZADA')->count(),
         ];
 
         return view('admin.postulaciones.show', compact('proponente', 'estadisticas'));
     }
+
+    // 🔹 Nuevo: lista documentos subidos por este proponente (JSON)
+public function documentos(Proponente $proponente)
+{
+    $codigo = request('proceso'); // ← viene del query string
+
+    $q = PostulacionArchivo::with(['proceso:codigo,objeto'])
+        ->where('proponente_id', $proponente->id);
+
+    if ($codigo) {
+        $q->where('proceso_codigo', $codigo);
+    }
+
+    $files = $q->latest()->get();
+
+    // Si viene proceso, NO agrupes: devuelve lista directa
+    if ($codigo) {
+        $items = $files->map(function ($a) {
+            $ruta = $a->ruta ?? $a->path ?? null;
+            return [
+                'id'    => $a->id,
+                'req'   => $a->requisito_key ?? '',
+                'name'  => $a->nombre_original ?? $a->nombre ?? ($ruta ? basename($ruta) : 'Documento'),
+                'url'   => $ruta ? Storage::url($ruta) : null,
+                'mime'  => $a->mime ?? '',
+                'fecha' => optional($a->created_at)->format('Y-m-d H:i'),
+            ];
+        })->values();
+
+        return response()->json([
+            'proceso_codigo' => $codigo,
+            'items' => $items,
+        ]);
+    }
+
+    // Si no viene proceso, devuélvelo agrupado (fallback)
+    $groups = $files->groupBy('proceso_codigo')->map(function ($set, $codigo) {
+        $proceso = optional($set->first()->proceso);
+        return [
+            'proceso_codigo' => $codigo,
+            'proceso_objeto' => $proceso?->objeto,
+            'items' => $set->map(function ($a) {
+                $ruta = $a->ruta ?? $a->path ?? null;
+                return [
+                    'id'    => $a->id,
+                    'req'   => $a->requisito_key ?? '',
+                    'name'  => $a->nombre_original ?? $a->nombre ?? ($ruta ? basename($ruta) : 'Documento'),
+                    'url'   => $ruta ? Storage::url($ruta) : null,
+                    'mime'  => $a->mime ?? '',
+                    'fecha' => optional($a->created_at)->format('Y-m-d H:i'),
+                ];
+            })->values(),
+        ];
+    })->values();
+
+    return response()->json(['data' => $groups]);
+}
+
 }
