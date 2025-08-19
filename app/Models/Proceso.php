@@ -70,4 +70,8 @@ class Proceso extends Model
     {
         return 'codigo';
     }
+    public function archivosPostulacion()
+    {
+        return $this->hasMany(PostulacionArchivo::class, 'proceso_codigo', 'codigo');
+    }
 }

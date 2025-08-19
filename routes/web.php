@@ -29,6 +29,17 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
     Route::get('/mis-postulaciones', [PostulacionController::class, 'index'])->name('postulaciones.index');
     Route::post('/procesos/{codigo}/postular', [PostulacionController::class, 'store'])->name('postulaciones.store');
     Route::delete('/procesos/{codigo}/postulaciones/{proponente}', [PostulacionController::class, 'destroy'])->name('postulaciones.destroy');
+
+    Route::get('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosForm'])
+        ->name('postulaciones.archivos.form');
+
+    
+    Route::post('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosStore'])
+        ->name('postulaciones.archivos.store');
+
+   
+    Route::get('/postulaciones/{codigo}/archivos/{key}', [PostulacionController::class, 'archivoShow'])
+        ->name('postulaciones.archivos.show');
 });
 
 Route::middleware(['auth', 'can:isAdmin'])->group(function () {

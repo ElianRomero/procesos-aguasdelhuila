@@ -13,10 +13,22 @@
 
     <div x-data="{
         showDetalle: false,
-        det: {},
+        det: {
+            codigo: '',
+            fecha: '',
+            objeto: '',
+            valor: '',
+            tipo: '',
+            estado_contrato: '',
+            tipo_contrato: '',
+            link: '',
+            secop_url: '',
+            requisitos: [],
+            ya: false
+        },
         secopUrl(idOrUrl) {
             if (!idOrUrl) return '';
-            // Si viene URL completa, extrae numConstancia
+            // Si viene URL completa, intenta extraer numConstancia
             if (/^https?:\/\//i.test(idOrUrl)) {
                 const m = idOrUrl.match(/numConstancia=([^&]+)/i);
                 return m ?
@@ -27,11 +39,23 @@
             return `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(idOrUrl)}`;
         },
         openDetalle(p) {
-            this.det = p;
-            this.det.secop_url = this.secopUrl(p.link);
+            this.det = {
+                codigo: p.codigo || '',
+                fecha: p.fecha || '',
+                objeto: p.objeto || '',
+                valor: p.valor || '',
+                tipo: p.tipo || '',
+                estado_contrato: p.estado_contrato || '',
+                tipo_contrato: p.tipo_contrato || '',
+                link: p.link || '',
+                requisitos: Array.isArray(p.requisitos) ? p.requisitos : [],
+                ya: !!p.ya,
+            };
+            this.det.secop_url = this.secopUrl(this.det.link);
             this.showDetalle = true;
         }
     }">
+
 
 
         @if (session('success'))
@@ -142,13 +166,14 @@
     'valor' => '$' . number_format($p->valor, 0, ',', '.'),
     'fecha' => optional($p->fecha)->format('d/m/Y'),
     'estadoPostulacion' => $estadoPost,
-    'link' => $p->link_secop,
+    'link' => $p->link_secop, // puede ser código SECOP o URL completa
     'tipo' => $p->tipoProceso->nombre ?? '',
     'estado_contrato' => $p->estadoContrato->nombre ?? '',
     'tipo_contrato' => $p->tipoContrato->nombre ?? '',
     'modalidad' => $p->modalidad_codigo ?? '',
+    'requisitos' => $p->requisitos ?? [], // 👈 AÑADIDO
+    'ya' => $ya, // 👈 AÑADIDO
 ]))">
-
                                     {{ $p->codigo }}
                                 </button>
                             </td>
@@ -239,6 +264,40 @@
                         class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
                         Ver en SECOP
                     </a>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-semibold mb-2">Requisitos </h4>
+
+                    <template x-if="!(det.requisitos && det.requisitos.length)">
+                        <p class="text-sm text-gray-500">Este proceso no tiene requisitos configurados.</p>
+                    </template>
+
+                    <ul class="list-disc pl-6 space-y-1 max-h-48 overflow-auto"
+                        x-show="det.requisitos && det.requisitos.length">
+                        <template x-for="r in det.requisitos" :key="r.key">
+                            <li class="text-sm" x-text="r.name"></li>
+                        </template>
+                    </ul>
+
+                    <p class="text-xs text-black font-bold mt-2">
+                        Para poder estar interesado en este proceso , debes adjuntar los documentos requeridos.
+                    </p>
+                </div>
+
+                {{-- Acciones --}}
+                <div class="mt-6 flex flex-wrap gap-3 items-center">
+                    {{-- Si NO está postulado, muestra botón para postular (POST) --}}
+
+
+                    {{-- Ir a subir/adjuntar documentos --}}
+                    <a :href="`{{ url('/postulaciones') }}/${det.codigo}/archivos`"
+                        class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                        <span x-text="det.ya ? 'Si, Continuar' : 'Continuar a subir documentos'"></span>
+                    </a>
+
+                    <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+                        Cerrar
+                    </button>
                 </div>
 
             </div>

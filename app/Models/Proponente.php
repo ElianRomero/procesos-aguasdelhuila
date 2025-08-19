@@ -22,7 +22,7 @@ class Proponente extends Model
         'telefono2',
         'correo',
         'sitio_web',
-        'google_drive_url', 
+        'google_drive_url',
         'actividad_inicio',
         'observacion',
     ];
@@ -68,5 +68,9 @@ class Proponente extends Model
     public function haPostuladoA(string $codigoProceso): bool
     {
         return $this->procesosPostulados()->where('procesos.codigo', $codigoProceso)->exists();
+    }
+    public function archivosPostulacion()
+    {
+        return $this->hasMany(PostulacionArchivo::class);
     }
 }
