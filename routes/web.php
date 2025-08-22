@@ -27,8 +27,11 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
     Route::put('/proponente/{proponente}', [ProponenteController::class, 'update'])->name('proponente.update');
 
     Route::get('/mis-postulaciones', [PostulacionController::class, 'index'])->name('postulaciones.index');
+
     Route::post('/postulaciones/{codigo}', [PostulacionController::class, 'store'])
         ->name('postulaciones.store');
+
+     
 
     Route::delete('/procesos/{codigo}/postulaciones/{proponente}', [PostulacionController::class, 'destroy'])->name('postulaciones.destroy');
 
@@ -65,6 +68,10 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/admin/proponentes/{proponente}/documentos', [AdminPostulacionesController::class, 'documentos'])
         ->name('proponentes.documentos');
 
+    Route::get('/proponentes/{proponente}/archivo/{path}', [AdminPostulacionesController::class, 'verArchivo'])
+        ->where('path', '.*')
+        ->name('proponentes.archivo')         
+        ->middleware('signed');
 
     Route::get('/admin/proponentes/{proponente}', [AdminPostulacionesController::class, 'show'])
         ->name('proponentes.show');

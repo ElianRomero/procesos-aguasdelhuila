@@ -116,13 +116,16 @@ class PostulacionController extends Controller
     }
 
     // Retirar postulación
-    public function destroy($codigo, Proponente $proponente)
-    {
-        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
-        $proceso->proponentesPostulados()->detach($proponente->id);
+    // Retirar postulación
+public function destroy($codigo, Proponente $proponente)
+{
+    $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+    $proceso->proponentesPostulados()->detach($proponente->id);
 
-        return back()->with('success', 'Postulación retirada.');
-    }
+    return redirect()->route('postulaciones.index')->with('success', 'Postulación retirada.');
+}
+
+
     // Mostrar form de subida de archivos por requisito
 
     // Guardar/actualizar PDFs por requisito

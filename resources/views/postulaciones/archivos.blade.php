@@ -2,8 +2,30 @@
 
 @section('content')
     <div class="max-w-4xl mx-auto">
-        <h1 class="text-2xl font-bold mb-2">Subir documentos</h1>
-        <div class="bg-white shadow rounded-lg p-6 mt-10">
+        {{-- Encabezado + botón Desinteresado (form aparte) --}}
+        <div class="flex items-center justify-between mb-3 mt-16">
+            <h1 class="text-2xl font-bold">Subir documentos</h1>
+
+            @php
+                $proponenteId = optional(auth()->user()->proponente)->id;
+            @endphp
+
+            @if ($proponenteId)
+                <form id="form-desinteresado" action="{{ route('postulaciones.destroy', [$proceso->codigo, $proponenteId]) }}"
+                    method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="px-3 py-2 rounded bg-gray-700 text-white hover:bg-gray-900">
+                        Desinteresado
+                    </button>
+                </form>
+            @endif
+        </div>
+
+
+
+
+        <div class="bg-white shadow rounded-lg p-6">
             <p class="text-gray-600 mb-6">
                 Proceso <span class="font-semibold">{{ $proceso->codigo }}</span> — {{ $proceso->objeto }}
             </p>
@@ -11,6 +33,7 @@
             @if (session('success'))
                 <div class="mb-4 rounded bg-green-50 text-green-800 px-3 py-2">{{ session('success') }}</div>
             @endif
+
             @if ($errors->any())
                 <div class="mb-4 rounded bg-red-50 text-red-700 px-3 py-2">
                     <ul class="list-disc pl-5">
@@ -27,6 +50,7 @@
                 </div>
             @endif
 
+            {{-- FORM de Guardar documentos (independiente) --}}
             <form action="{{ route('postulaciones.archivos.store', $proceso->codigo) }}" method="POST"
                 enctype="multipart/form-data" class="space-y-4">
                 @csrf
@@ -53,8 +77,10 @@
                             <div class="text-sm text-gray-600 mt-2">
                                 Ya subido: {{ $ya->original_name }}
                                 ({{ number_format(($ya->size_bytes ?? 0) / 1024, 0) }} KB)
-                                — <a class="underline text-blue-600"
-                                    href="{{ route('postulaciones.archivos.show', [$proceso->codigo, $k]) }}">
+                                —
+                                <a class="underline text-blue-600"
+                                    href="{{ route('postulaciones.archivos.show', [$proceso->codigo, $k]) }}"
+                                    target="_blank">
                                     ver
                                 </a>
                             </div>
@@ -62,19 +88,42 @@
                     </div>
                 @endforeach
 
-               <button type="button"
-        onclick="if (history.length > 1) history.back(); else window.location='{{ route('postulaciones.index') }}';"
-        class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
-  Volver
-</button>
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button"
+                        onclick="if (history.length > 1) history.back(); else window.location='{{ route('postulaciones.index') }}';"
+                        class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+                        Volver
+                    </button>
 
-
-                    <button class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                    <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
                         Guardar documentos
                     </button>
                 </div>
             </form>
-
         </div>
     </div>
+@endsection
+@section('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        (function() {
+            const form = document.getElementById('form-desinteresado');
+            if (!form) return;
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                Swal.fire({
+                    title: '¿Marcar como desinteresado?',
+                    text: 'Se retirará tu postulación a este proceso.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, retirar',
+                    cancelButtonText: 'Cancelar',
+                    reverseButtons: true,
+                }).then((res) => {
+                    if (res.isConfirmed) form.submit();
+                });
+            });
+        })();
+    </script>
 @endsection

@@ -79,7 +79,10 @@
                 <h3 class="text-lg font-semibold">Mis Oportunidades Activas</h3>
                 <span class="text-sm text-gray-500">{{ $misPostulaciones->count() }} en total</span>
             </div>
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-gray-500">Recuerda adjuntar los documetnos necesarios para tu proceso de interes.</p>
 
+            </div>
             @if ($misPostulaciones->isEmpty())
                 <div class="text-gray-500">Aún no te has postulado a ningún proceso.</div>
             @else
@@ -152,7 +155,7 @@
                         <th>Objeto</th>
                         <th>Valor</th>
                         <th>Fecha</th>
-                        <th>Acción</th>
+
                     </tr>
                 </thead>
                 <tbody>
@@ -191,25 +194,7 @@
 
 
                             {{-- ACCIÓN (postular/retirar) --}}
-                            <td>
-                                @if (!$ya)
-                                    <form action="{{ route('postulaciones.store', $p->codigo) }}" method="POST"
-                                        class="inline">
-                                        @csrf
-                                        <button class="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-800">
-                                            Interesado
-                                        </button>
-                                    </form>
-                                @else
-                                    <form action="{{ route('postulaciones.destroy', [$p->codigo, $miProponente->id]) }}"
-                                        method="POST" class="inline">
-                                        @csrf @method('DELETE')
-                                        <button class="ml-2 px-3 py-1 rounded bg-gray-600 text-white hover:bg-gray-800">
-                                            Desinteresado
-                                        </button>
-                                    </form>
-                                @endif
-                            </td>
+
                         </tr>
                     @endforeach
                 </tbody>
@@ -307,7 +292,7 @@
                         @submit="$event.target.querySelector('button[type=submit]').disabled = true">
                         @csrf
                         <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-                            <span x-text="det.ya ? 'Sí, Continuar' : 'Postularme y subir documentos'"></span>
+                            <span x-text="det.ya ? 'Sí, Continuar' : 'Interesado'"></span>
                         </button>
                     </form>
 
@@ -347,7 +332,7 @@
                             searchable: false
                         }, // Valor
                         {
-                            targets: 4,
+                            targets: 3,
                             orderable: false,
                             searchable: false
                         }, // Acción

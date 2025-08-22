@@ -9,6 +9,8 @@ use App\Models\Proponente;
 use Illuminate\Support\Facades\DB;
 use App\Models\PostulacionArchivo;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\URL;
 
 class AdminPostulacionesController extends Controller
 {
@@ -76,60 +78,91 @@ class AdminPostulacionesController extends Controller
     }
 
     // 🔹 Nuevo: lista documentos subidos por este proponente (JSON)
-public function documentos(Proponente $proponente)
-{
-    $codigo = request('proceso'); // ← viene del query string
+    public function documentos(Proponente $proponente)
+    {
+        $codigo = request('proceso'); // ← viene del query string
 
-    $q = PostulacionArchivo::with(['proceso:codigo,objeto'])
-        ->where('proponente_id', $proponente->id);
+        $q = PostulacionArchivo::with(['proceso:codigo,objeto'])
+            ->where('proponente_id', $proponente->id);
 
-    if ($codigo) {
-        $q->where('proceso_codigo', $codigo);
-    }
+        if ($codigo) {
+            $q->where('proceso_codigo', $codigo);
+        }
 
-    $files = $q->latest()->get();
+        $files = $q->latest()->get();
 
-    // Si viene proceso, NO agrupes: devuelve lista directa
-    if ($codigo) {
-        $items = $files->map(function ($a) {
-            $ruta = $a->ruta ?? $a->path ?? null;
-            return [
-                'id'    => $a->id,
-                'req'   => $a->requisito_key ?? '',
-                'name'  => $a->nombre_original ?? $a->nombre ?? ($ruta ? basename($ruta) : 'Documento'),
-                'url'   => $ruta ? Storage::url($ruta) : null,
-                'mime'  => $a->mime ?? '',
-                'fecha' => optional($a->created_at)->format('Y-m-d H:i'),
-            ];
-        })->values();
-
-        return response()->json([
-            'proceso_codigo' => $codigo,
-            'items' => $items,
-        ]);
-    }
-
-    // Si no viene proceso, devuélvelo agrupado (fallback)
-    $groups = $files->groupBy('proceso_codigo')->map(function ($set, $codigo) {
-        $proceso = optional($set->first()->proceso);
-        return [
-            'proceso_codigo' => $codigo,
-            'proceso_objeto' => $proceso?->objeto,
-            'items' => $set->map(function ($a) {
+        // Si viene proceso, NO agrupes: devuelve lista directa
+        if ($codigo) {
+            $items = $files->map(function ($a) use ($proponente) {
                 $ruta = $a->ruta ?? $a->path ?? null;
+                $ruta = $ruta ? str_replace('\\', '/', $ruta) : null; // <-- normaliza
+
                 return [
                     'id'    => $a->id,
                     'req'   => $a->requisito_key ?? '',
                     'name'  => $a->nombre_original ?? $a->nombre ?? ($ruta ? basename($ruta) : 'Documento'),
-                    'url'   => $ruta ? Storage::url($ruta) : null,
+                    'url'   => $ruta
+                        ? URL::temporarySignedRoute(
+                            'proponentes.archivo',
+                            now()->addMinutes(30),
+                            ['proponente' => $proponente->id, 'path' => $ruta]
+                        )
+                        : null,
                     'mime'  => $a->mime ?? '',
                     'fecha' => optional($a->created_at)->format('Y-m-d H:i'),
                 ];
-            })->values(),
-        ];
-    })->values();
+            })->values();
 
-    return response()->json(['data' => $groups]);
-}
+            return response()->json([
+                'proceso_codigo' => $codigo,
+                'items' => $items,
+            ]);
+        }
 
+        // Si no viene proceso, devuélvelo agrupado (fallback)
+        $groups = $files->groupBy('proceso_codigo')->map(function ($set, $codigo) {
+            $proceso = optional($set->first()->proceso);
+            return [
+                'proceso_codigo' => $codigo,
+                'proceso_objeto' => $proceso?->objeto,
+                'items' => $set->map(function ($a) {
+                    $ruta = $a->ruta ?? $a->path ?? null;
+                    return [
+                        'id'    => $a->id,
+                        'req'   => $a->requisito_key ?? '',
+                        'name'  => $a->nombre_original ?? $a->nombre ?? ($ruta ? basename($ruta) : 'Documento'),
+                        'url'   => $ruta ? Storage::url($ruta) : null,
+                        'mime'  => $a->mime ?? '',
+                        'fecha' => optional($a->created_at)->format('Y-m-d H:i'),
+                    ];
+                })->values(),
+            ];
+        })->values();
+
+        return response()->json(['data' => $groups]);
+    }
+    public function verArchivo(Proponente $proponente, string $path)
+    {
+        $disk = Storage::disk('private');              // sigues usando storage/app/private
+        $path = str_replace('\\', '/', $path);         // normaliza por si vienen backslashes
+
+        // Seguridad básica: el archivo debe ser del proponente
+        if (!Str::contains($path, "/proponentes/{$proponente->id}/")) {
+            abort(403);
+        }
+
+        if (!$disk->exists($path)) {
+            abort(404);
+        }
+
+        $fullPath = $disk->path($path);
+        $mime = $disk->mimeType($path) ?: 'application/pdf';
+        $name = basename($path);
+
+        // Mostrar inline (ideal para PDF en modal o nueva pestaña)
+        return response()->file($fullPath, [
+            'Content-Type'        => $mime,
+            'Content-Disposition' => 'inline; filename="' . $name . '"',
+        ]);
+    }
 }
