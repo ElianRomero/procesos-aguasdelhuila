@@ -16,31 +16,33 @@ use Illuminate\Support\Facades\Log;
 class ProcesoController extends Controller
 {
     public function create(Request $request)
-    {
-        $tiposProceso = TipoProceso::all();
-        $estadosContrato = EstadoContrato::all();
-        $tiposContrato = TipoContrato::all();
-        $procesos = Proceso::latest('created_at')->get();
+{
+    $tiposProceso     = TipoProceso::all();
+    $estadosContrato  = EstadoContrato::all();
+    $tiposContrato    = TipoContrato::all();
 
-        // 🔹 Cargar proponentes
-        $proponentes = Proponente::select('id', 'razon_social', 'nit')
-            ->orderBy('razon_social')
-            ->get();
+    // 👉 trae proponente para pintar la columna
+    $procesos = Proceso::with('proponente')
+        ->latest('created_at')
+        ->get();
 
-        $procesoEditar = null;
-        if ($request->has('editar')) {
-            $procesoEditar = Proceso::where('codigo', $request->editar)->first();
-        }
+    // 👉 opciones de estado para el select de filtro
+    $estados = $procesos->pluck('estado')->filter()->unique()->values();
 
-        return view('procesos.create', compact(
-            'tiposProceso',
-            'estadosContrato',
-            'tiposContrato',
-            'procesos',
-            'proponentes',
-            'procesoEditar'
-        ));
+    $proponentes = Proponente::select('id', 'razon_social', 'nit')
+        ->orderBy('razon_social')->get();
+
+    $procesoEditar = null;
+    if ($request->has('editar')) {
+        $procesoEditar = Proceso::where('codigo', $request->editar)->first();
     }
+
+    return view('procesos.create', compact(
+        'tiposProceso','estadosContrato','tiposContrato',
+        'procesos','proponentes','procesoEditar','estados'
+    ));
+}
+
 
 
 

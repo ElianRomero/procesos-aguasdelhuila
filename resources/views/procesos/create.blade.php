@@ -171,6 +171,18 @@
                 </form>
             </div>
         </div>
+        @php $estadosUnicos = $procesos->pluck('estado')->filter()->unique()->values(); @endphp
+        <div class="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+            <input id="filtroGlobal" type="text" placeholder="Buscar..."
+                class="w-full md:w-1/2 border rounded px-3 py-2" />
+            <select id="filtroEstado" class="border rounded px-3 py-2">
+                <option value="">Todos los estados</option>
+                @foreach ($estadosUnicos as $e)
+                    <option value="{{ $e }}">{{ $e }}</option>
+                @endforeach
+            </select>
+        </div>
+
         <div x-data="{
             mostrarFormulario: {{ $editando ? 'true' : 'false' }},
             showProponente: false,
@@ -185,7 +197,7 @@
         }">
 
             <div class="bg-white rounded-xl shadow-md border overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table id="tablaProcesos" class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-200">
                         <tr class="text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             <th class="px-4 py-2">Código</th>
@@ -193,28 +205,72 @@
                             <th class="px-4 py-2">Fecha</th>
                             <th class="px-4 py-2">Objeto</th>
                             <th class="px-4 py-2">Valor</th>
-                            <th class="px-4 py-2">Proponente</th> <!-- 🔹 Nueva columna -->
+                            <th class="px-4 py-2">Proponente</th>
                             <th class="px-4 py-2">Acciones</th>
                         </tr>
                     </thead>
+
                     <tbody class="bg-white divide-y divide-gray-100">
                         @foreach ($procesos as $proceso)
-                            <tr class="hover:bg-gray-50 text-sm">
+                            @php
+                                $propoName = optional($proceso->proponente)->razon_social ?? '';
+                                $valorFmt = number_format($proceso->valor, 0, ',', '.');
+                                $fechaFmt = \Carbon\Carbon::parse($proceso->fecha)->format('d/m/Y');
+                                $busqueda = \Illuminate\Support\Str::lower(
+                                    ($proceso->codigo ?? '') .
+                                        ' ' .
+                                        ($proceso->estado ?? '') .
+                                        ' ' .
+                                        $fechaFmt .
+                                        ' ' .
+                                        ($proceso->objeto ?? '') .
+                                        ' ' .
+                                        $valorFmt .
+                                        ' ' .
+                                        $propoName,
+                                );
+
+                                $estadoPill = strtoupper($proceso->estado ?? 'CREADO');
+                                $color =
+                                    [
+                                        'CREADO' => 'bg-gray-100 text-gray-700',
+                                        'EN CURSO' => 'bg-blue-100 text-blue-700',
+                                        'CERRADO' => 'bg-green-100 text-green-700',
+                                        'ANULADO' => 'bg-red-100 text-red-700',
+                                    ][$estadoPill] ?? 'bg-gray-100 text-gray-700';
+                            @endphp
+
+                            <tr class="hover:bg-gray-50 text-sm" data-busqueda="{{ e($busqueda) }}"
+                                data-estado="{{ $proceso->estado ?? '' }}">
+                                {{-- Código --}}
                                 <td class="px-4 py-2">
-                                    <button class="btn-detalle px-3 underline py-1.5 rounded-lg  text-blue-600"
+                                    <button class="btn-detalle px-3 underline py-1.5 rounded-lg text-blue-600"
                                         data-codigo="{{ $proceso->codigo }}" data-objeto="{{ e($proceso->objeto) }}"
-                                        data-valor="{{ number_format($proceso->valor, 0, ',', '.') }}"
-                                        data-estado="{{ $proceso->estado }}"
+                                        data-valor="{{ $valorFmt }}" data-estado="{{ $proceso->estado }}"
                                         data-fecha="{{ \Carbon\Carbon::parse($proceso->fecha)->format('Y-m-d') }}"
                                         data-secop="{{ $proceso->link_secop }}">
                                         {{ $proceso->codigo }}
                                     </button>
                                 </td>
-                                <td class="px-4 py-2">{{ $proceso->estado }}</td>
-                                <td class="px-4 py-2">{{ \Carbon\Carbon::parse($proceso->fecha)->format('d/m/Y') }}</td>
-                                <td class="px-4 py-2">{{ Str::limit($proceso->objeto, 60) }}</td>
-                                <td class="px-4 py-2">${{ number_format($proceso->valor, 0, ',', '.') }}</td>
 
+                                {{-- Estado (pill) --}}
+                                <td class="px-4 py-2">
+                                    <span
+                                        class="px-2 py-1 rounded text-xs font-semibold {{ $color }}">{{ $estadoPill }}</span>
+                                </td>
+
+                                {{-- Fecha --}}
+                                <td class="px-4 py-2">{{ $fechaFmt }}</td>
+
+                                {{-- Objeto --}}
+                                <td class="px-4 py-2 truncate max-w-[30ch]" title="{{ $proceso->objeto }}">
+                                    {{ \Illuminate\Support\Str::limit($proceso->objeto, 60) }}
+                                </td>
+
+                                {{-- Valor --}}
+                                <td class="px-4 py-2">$ {{ $valorFmt }}</td>
+
+                                {{-- Proponente --}}
                                 <td class="px-4 py-2">
                                     @if ($proceso->estado === 'CREADO')
                                         <span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-700">
@@ -222,14 +278,12 @@
                                         </span>
                                     @else
                                         @if ($proceso->proponente)
-                                            {{-- Botón de ojo para ver detalle --}}
+                                            {{-- Ver proponente --}}
                                             <a href="{{ route('proponentes.show', $proceso->proponente) }}"
                                                 class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600"
-                                                title="Ver proponente">
-                                                👁️
-                                            </a>
+                                                title="Ver proponente">👁️</a>
 
-                                            {{-- Botón para cambiar proponente --}}
+                                            {{-- Cambiar proponente --}}
                                             <button class="ml-2 text-indigo-600 hover:underline"
                                                 @click.prevent="openProponenteModal('{{ $proceso->codigo }}', '{{ $proceso->estado }}')">
                                                 Cambiar
@@ -243,6 +297,8 @@
                                         @endif
                                     @endif
                                 </td>
+
+                                {{-- Acciones --}}
                                 <td class="px-4 py-2">
                                     <div class="flex items-center gap-2">
                                         {{-- Editar --}}
@@ -252,7 +308,6 @@
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" class="w-5 h-5" stroke-width="1.5"
                                                 stroke-linecap="round" stroke-linejoin="round">
-                                                <!-- pencil (heroicons-like) -->
                                                 <path
                                                     d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L9.06 18.653a4.5 4.5 0 0 1-1.897 1.13L3 21l1.217-4.163a4.5 4.5 0 0 1 1.13-1.897L16.862 4.487z" />
                                                 <path d="M19.5 7.5L16.5 4.5" />
@@ -271,7 +326,6 @@
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                     fill="none" stroke="currentColor" class="w-5 h-5"
                                                     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                                    <!-- trash (heroicons-like) -->
                                                     <path d="M4.5 6.75h15" />
                                                     <path
                                                         d="M9.75 6.75V5.25A1.5 1.5 0 0 1 11.25 3.75h1.5a1.5 1.5 0 0 1 1.5 1.5v1.5" />
@@ -283,7 +337,6 @@
                                         </form>
                                     </div>
                                 </td>
-
                             </tr>
                         @endforeach
                     </tbody>
@@ -444,6 +497,37 @@
                     window.open(urlSecop, '_blank', 'noopener,noreferrer');
                 }
             });
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabla = document.getElementById('tablaProcesos');
+            if (!tabla) return;
+
+            const input = document.getElementById('filtroGlobal'); // <input>
+            const sel = document.getElementById('filtroEstado'); // <select>
+            const rows = Array.from(tabla.querySelectorAll('tbody tr'));
+
+            const norm = (s) => (s ?? '').toString()
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+
+            const filtrar = () => {
+                const q = input ? norm(input.value.trim()) : '';
+                const est = sel ? sel.value : '';
+
+                rows.forEach(tr => {
+                    const texto = norm(tr.dataset.busqueda || '');
+                    const estado = tr.dataset.estado || '';
+                    const okTexto = !q || texto.includes(q);
+                    const okEstado = !est || estado === est;
+                    tr.style.display = (okTexto && okEstado) ? '' : 'none';
+                });
+            };
+
+            if (input) input.addEventListener('input', filtrar);
+            if (sel) sel.addEventListener('change', filtrar);
         });
     </script>
 @endsection
