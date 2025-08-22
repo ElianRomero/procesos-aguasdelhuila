@@ -31,7 +31,7 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
     Route::post('/postulaciones/{codigo}', [PostulacionController::class, 'store'])
         ->name('postulaciones.store');
 
-     
+
 
     Route::delete('/procesos/{codigo}/postulaciones/{proponente}', [PostulacionController::class, 'destroy'])->name('postulaciones.destroy');
 
@@ -55,7 +55,9 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/procesos', [ProcesoController::class, 'store'])->name('procesos.store');
     Route::get('/procesos/{codigo}/edit', [ProcesoController::class, 'edit'])->name('procesos.edit');
     Route::put('/procesos/{codigo}', [ProcesoController::class, 'update'])->name('procesos.update');
-
+    
+    Route::delete('/procesos/{proceso}', [ProcesoController::class, 'destroy'])
+        ->name('procesos.destroy');
     Route::post('/procesos/{codigo}/asignar-proponente', [ProcesoController::class, 'asignarProponente'])->name('procesos.asignarProponente');
     Route::post('/procesos/{codigo}/postulaciones/{proponente}/estado', [PostulacionController::class, 'cambiarEstado'])->name('postulaciones.cambiarEstado');
 
@@ -70,7 +72,7 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 
     Route::get('/proponentes/{proponente}/archivo/{path}', [AdminPostulacionesController::class, 'verArchivo'])
         ->where('path', '.*')
-        ->name('proponentes.archivo')         
+        ->name('proponentes.archivo')
         ->middleware('signed');
 
     Route::get('/admin/proponentes/{proponente}', [AdminPostulacionesController::class, 'show'])

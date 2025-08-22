@@ -91,6 +91,15 @@ class ProcesoController extends Controller
 
         return redirect()->route('procesos.create')->with('success', 'Proceso creado correctamente.');
     }
+public function destroy(Proceso $proceso)
+{
+    try {
+        $proceso->delete();
+        return back()->with('success', 'Proceso eliminado.');
+    } catch (\Throwable $e) {
+        return back()->withErrors('No se puede eliminar: está relacionado con otros registros.');
+    }
+}
 
 
     public function edit(string $codigo)

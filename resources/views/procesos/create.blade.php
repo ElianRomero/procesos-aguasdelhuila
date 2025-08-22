@@ -244,9 +244,46 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-2">
-                                    <a href="{{ route('procesos.create', ['editar' => $proceso->codigo]) }}"
-                                        class="text-indigo-600 hover:underline">Editar</a>
+                                    <div class="flex items-center gap-2">
+                                        {{-- Editar --}}
+                                        <a href="{{ route('procesos.create', ['editar' => $proceso->codigo]) }}"
+                                            class="inline-flex items-center justify-center rounded-md p-2 text-indigo-600 hover:bg-indigo-50"
+                                            title="Editar" aria-label="Editar">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" class="w-5 h-5" stroke-width="1.5"
+                                                stroke-linecap="round" stroke-linejoin="round">
+                                                <!-- pencil (heroicons-like) -->
+                                                <path
+                                                    d="M16.862 4.487a2.25 2.25 0 1 1 3.182 3.182L9.06 18.653a4.5 4.5 0 0 1-1.897 1.13L3 21l1.217-4.163a4.5 4.5 0 0 1 1.13-1.897L16.862 4.487z" />
+                                                <path d="M19.5 7.5L16.5 4.5" />
+                                            </svg>
+                                        </a>
+
+                                        {{-- Eliminar --}}
+                                        <form action="{{ route('procesos.destroy', $proceso) }}" method="POST"
+                                            class="inline"
+                                            onsubmit="return confirm('¿Eliminar el proceso {{ $proceso->codigo }}?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                class="inline-flex items-center justify-center rounded-md p-2 text-red-600 hover:bg-red-50"
+                                                title="Eliminar" aria-label="Eliminar">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    fill="none" stroke="currentColor" class="w-5 h-5"
+                                                    stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                                    <!-- trash (heroicons-like) -->
+                                                    <path d="M4.5 6.75h15" />
+                                                    <path
+                                                        d="M9.75 6.75V5.25A1.5 1.5 0 0 1 11.25 3.75h1.5a1.5 1.5 0 0 1 1.5 1.5v1.5" />
+                                                    <path
+                                                        d="M6.75 6.75l.84 12.116A2.25 2.25 0 0 0 9.835 21h4.33a2.25 2.25 0 0 0 2.245-2.134L17.25 6.75" />
+                                                    <path d="M10.5 10.5v7.5M13.5 10.5v7.5" />
+                                                </svg>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
+
                             </tr>
                         @endforeach
                     </tbody>
