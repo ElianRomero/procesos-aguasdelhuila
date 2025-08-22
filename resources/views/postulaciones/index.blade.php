@@ -251,7 +251,7 @@
                     Art. 13 de la Ley 1150 de 2007, el presente contrato se encuentra publicado en el SECOP II y podrá
                     acceder a través del siguiente botón.
                 </div>
-
+                
                 <!-- Botón SECOP -->
                 <div class="mt-4" x-show="det.secop_url">
                     <a :href="det.secop_url" target="_blank" rel="noopener noreferrer"
@@ -282,6 +282,10 @@
                     <p class="text-xs text-black font-bold mt-3">
                         Para poder estar interesado en este proceso, debes adjuntar los documentos requeridos.
                     </p>
+                </div>
+<div class="mt-5 p-3 rounded-lg bg-gray-50 border text-[13px] leading-relaxed text-gray-700">
+                    <h2>Observaciones</h2
+                    <p class="mt-2">El tiempo para presentar Observaciones será definido por la entidad</p>
                 </div>
 
 
