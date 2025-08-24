@@ -24,7 +24,8 @@
             link: '',
             secop_url: '',
             requisitos: [],
-            ya: false
+            ya: false,
+            observaciones: ''
         },
         routeStore(codigo) {
             return `{{ route('postulaciones.store', ':codigo') }}`.replace(':codigo', encodeURIComponent(codigo));
@@ -54,6 +55,7 @@
                 link: p.link || '',
                 requisitos: Array.isArray(p.requisitos) ? p.requisitos : [],
                 ya: !!p.ya,
+                observaciones: p.observaciones || ''
             };
             this.det.secop_url = this.secopUrl(this.det.link);
             this.showDetalle = true;
@@ -80,7 +82,8 @@
                 <span class="text-sm text-gray-500">{{ $misPostulaciones->count() }} en total</span>
             </div>
             <div class="flex items-center justify-between mb-3">
-                <p class="text-xs font-semibold text-gray-500">Recuerda adjuntar los documetnos necesarios para tu proceso de interes.</p>
+                <p class="text-xs font-semibold text-gray-500">Recuerda adjuntar los documetnos necesarios para tu proceso
+                    de interes.</p>
 
             </div>
             @if ($misPostulaciones->isEmpty())
@@ -182,6 +185,7 @@
     'modalidad' => $p->modalidad_codigo ?? '',
     'requisitos' => $p->requisitos ?? [], // 👈 AÑADIDO
     'ya' => $ya, // 👈 AÑADIDO
+    'observaciones' => $p->observaciones ?? '',
 ]))">
                                     {{ $p->codigo }}
                                 </button>
@@ -251,7 +255,7 @@
                     Art. 13 de la Ley 1150 de 2007, el presente contrato se encuentra publicado en el SECOP II y podrá
                     acceder a través del siguiente botón.
                 </div>
-                
+
                 <!-- Botón SECOP -->
                 <div class="mt-4" x-show="det.secop_url">
                     <a :href="det.secop_url" target="_blank" rel="noopener noreferrer"
@@ -282,68 +286,69 @@
                     <p class="text-xs text-black font-bold mt-3">
                         Para poder estar interesado en este proceso, debes adjuntar los documentos requeridos.
                     </p>
-                </div>
-<div class="mt-5 p-3 rounded-lg bg-gray-50 border text-[13px] leading-relaxed text-gray-700">
-                    <h2>Observaciones</h2
-                    <p class="mt-2">El tiempo para presentar Observaciones será definido por la entidad</p>
-                </div>
+                    <div x-show="det.observaciones && det.observaciones.trim() !== ''" x-cloak
+                        class="mt-5 p-3 rounded-lg bg-gray-50 border text-[13px] leading-relaxed text-gray-700">
+                        <h2 class="text-sm font-semibold">Observaciones</h2>
+                        <p class="mt-2 whitespace-pre-line" x-text="det.observaciones"></p>
+                    </div>
 
 
-                <!-- Acciones -->
-                <!-- Acciones -->
-                <div class="mt-6 flex flex-wrap gap-3 items-center">
-                    <form :action="routeStore(det.codigo)" method="POST" class="inline"
-                        @submit="$event.target.querySelector('button[type=submit]').disabled = true">
-                        @csrf
-                        <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-                            <span x-text="det.ya ? 'Sí, Continuar' : 'Interesado'"></span>
+
+                    <!-- Acciones -->
+                    <!-- Acciones -->
+                    <div class="mt-6 flex flex-wrap gap-3 items-center">
+                        <form :action="routeStore(det.codigo)" method="POST" class="inline"
+                            @submit="$event.target.querySelector('button[type=submit]').disabled = true">
+                            @csrf
+                            <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                                <span x-text="det.ya ? 'Sí, Continuar' : 'Interesado'"></span>
+                            </button>
+                        </form>
+
+                        <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+                            Cerrar
                         </button>
-                    </form>
-
-                    <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
-                        Cerrar
-                    </button>
+                    </div>
                 </div>
             </div>
+
         </div>
 
-    </div>
 
+    @endsection
+    @section('scripts')
+        <script src="https://unpkg.com/alpinejs" defer></script>
 
-@endsection
-@section('scripts')
-    <script src="https://unpkg.com/alpinejs" defer></script>
+        <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
+        <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js" defer></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const start = () => {
+                    if (!window.jQuery || !window.DataTable) return setTimeout(start, 50);
 
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" defer></script>
-    <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js" defer></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const start = () => {
-                if (!window.jQuery || !window.DataTable) return setTimeout(start, 50);
-
-                new DataTable('#tabla-procesos', {
-                    responsive: true,
-                    order: [
-                        [3, 'desc']
-                    ], // Fecha (col 3)
-                    pageLength: 10,
-                    language: {
-                        url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json'
-                    },
-                    columnDefs: [{
-                            targets: 2,
-                            searchable: false
-                        }, // Valor
-                        {
-                            targets: 3,
-                            orderable: false,
-                            searchable: false
-                        }, // Acción
-                    ],
-                });
-            };
-            start();
-        });
-    </script>
-@endsection
+                    new DataTable('#tabla-procesos', {
+                        responsive: true,
+                        order: [
+                            [3, 'desc']
+                        ], // Fecha (col 3)
+                        pageLength: 10,
+                        language: {
+                            url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json'
+                        },
+                        columnDefs: [{
+                                targets: 2,
+                                searchable: false
+                            }, // Valor
+                            {
+                                targets: 3,
+                                orderable: false,
+                                searchable: false
+                            }, // Acción
+                        ],
+                    });
+                };
+                start();
+            });
+        </script>
+    @endsection

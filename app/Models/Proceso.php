@@ -26,6 +26,7 @@ class Proceso extends Model
         'estado',
         'proponente_id',
         'requisitos',
+        'observaciones',
     ];
 
     protected $casts = [

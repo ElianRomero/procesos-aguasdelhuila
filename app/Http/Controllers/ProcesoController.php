@@ -16,32 +16,37 @@ use Illuminate\Support\Facades\Log;
 class ProcesoController extends Controller
 {
     public function create(Request $request)
-{
-    $tiposProceso     = TipoProceso::all();
-    $estadosContrato  = EstadoContrato::all();
-    $tiposContrato    = TipoContrato::all();
+    {
+        $tiposProceso     = TipoProceso::all();
+        $estadosContrato  = EstadoContrato::all();
+        $tiposContrato    = TipoContrato::all();
 
-    // 👉 trae proponente para pintar la columna
-    $procesos = Proceso::with('proponente')
-        ->latest('created_at')
-        ->get();
+        // 👉 trae proponente para pintar la columna
+        $procesos = Proceso::with('proponente')
+            ->latest('created_at')
+            ->get();
 
-    // 👉 opciones de estado para el select de filtro
-    $estados = $procesos->pluck('estado')->filter()->unique()->values();
+        // 👉 opciones de estado para el select de filtro
+        $estados = $procesos->pluck('estado')->filter()->unique()->values();
 
-    $proponentes = Proponente::select('id', 'razon_social', 'nit')
-        ->orderBy('razon_social')->get();
+        $proponentes = Proponente::select('id', 'razon_social', 'nit')
+            ->orderBy('razon_social')->get();
 
-    $procesoEditar = null;
-    if ($request->has('editar')) {
-        $procesoEditar = Proceso::where('codigo', $request->editar)->first();
+        $procesoEditar = null;
+        if ($request->has('editar')) {
+            $procesoEditar = Proceso::where('codigo', $request->editar)->first();
+        }
+
+        return view('procesos.create', compact(
+            'tiposProceso',
+            'estadosContrato',
+            'tiposContrato',
+            'procesos',
+            'proponentes',
+            'procesoEditar',
+            'estados'
+        ));
     }
-
-    return view('procesos.create', compact(
-        'tiposProceso','estadosContrato','tiposContrato',
-        'procesos','proponentes','procesoEditar','estados'
-    ));
-}
 
 
 
@@ -60,6 +65,7 @@ class ProcesoController extends Controller
             'tipo_contrato_codigo' => 'required|exists:tipo_contratos,codigo',
             'modalidad_codigo' => 'nullable|string|max:100',
             'requisitos_json' => 'nullable|string',
+            'observaciones' => 'nullable|string',
         ]);
 
         // limpiar valor
@@ -89,19 +95,20 @@ class ProcesoController extends Controller
             'modalidad_codigo' => $request->modalidad_codigo,
             'estado' => 'CREADO',
             'requisitos' => $requisitos,
+            'observaciones' => $request->observaciones,
         ]);
 
         return redirect()->route('procesos.create')->with('success', 'Proceso creado correctamente.');
     }
-public function destroy(Proceso $proceso)
-{
-    try {
-        $proceso->delete();
-        return back()->with('success', 'Proceso eliminado.');
-    } catch (\Throwable $e) {
-        return back()->withErrors('No se puede eliminar: está relacionado con otros registros.');
+    public function destroy(Proceso $proceso)
+    {
+        try {
+            $proceso->delete();
+            return back()->with('success', 'Proceso eliminado.');
+        } catch (\Throwable $e) {
+            return back()->withErrors('No se puede eliminar: está relacionado con otros registros.');
+        }
     }
-}
 
 
     public function edit(string $codigo)
@@ -148,6 +155,7 @@ public function destroy(Proceso $proceso)
             'modalidad_codigo' => 'nullable|string|max:100',
             'estado' => 'required|in:CREADO,VIGENTE,CERRADO',
             'requisitos_json' => 'nullable|string',
+            'observaciones' => 'nullable|string',
         ]);
 
         // Valor
@@ -172,7 +180,7 @@ public function destroy(Proceso $proceso)
         $proceso->tipo_contrato_codigo = $request->tipo_contrato_codigo;
         $proceso->modalidad_codigo = $request->modalidad_codigo;
         $proceso->estado = $request->estado;
-
+        $proceso->observaciones = $request->observaciones;
         // Requisitos (si vienen) → el cast 'array' se encarga del JSON
         if ($request->filled('requisitos_json')) {
             $proceso->requisitos = $this->parseRequisitos($request->input('requisitos_json'));

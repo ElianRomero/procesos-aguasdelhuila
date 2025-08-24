@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminPostulacionesController;
+use App\Http\Controllers\ParametrosContratoController;
 use App\Http\Controllers\ProcesoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProponenteController;
@@ -55,7 +56,7 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::post('/procesos', [ProcesoController::class, 'store'])->name('procesos.store');
     Route::get('/procesos/{codigo}/edit', [ProcesoController::class, 'edit'])->name('procesos.edit');
     Route::put('/procesos/{codigo}', [ProcesoController::class, 'update'])->name('procesos.update');
-    
+
     Route::delete('/procesos/{proceso}', [ProcesoController::class, 'destroy'])
         ->name('procesos.destroy');
     Route::post('/procesos/{codigo}/asignar-proponente', [ProcesoController::class, 'asignarProponente'])->name('procesos.asignarProponente');
@@ -77,6 +78,13 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 
     Route::get('/admin/proponentes/{proponente}', [AdminPostulacionesController::class, 'show'])
         ->name('proponentes.show');
+
+    Route::prefix('admin/parametros')->name('parametros.')->group(function () {
+        Route::get('/', [ParametrosContratoController::class, 'index'])->name('index');
+        Route::post('/store', [ParametrosContratoController::class, 'store'])->name('store');
+        Route::put('/{entidad}/{id}', [ParametrosContratoController::class, 'update'])->name('update');
+        Route::delete('/{entidad}/{id}', [ParametrosContratoController::class, 'destroy'])->name('destroy');
+    });
 });
 
 

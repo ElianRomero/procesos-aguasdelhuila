@@ -158,7 +158,11 @@
                         @endif
                         <x-requisitos-field name="requisitos_json" :initial="old('requisitos_json', $editando ? $procesoEditar->requisitos ?? [] : [])" label="Requisitos del Proceso (PDF)" />
                     </div>
-
+                    <div class="md:col-span-3">
+                        <label class="block font-medium">Observaciones</label>
+                        <textarea name="observaciones" class="w-full border-gray-300 rounded" rows="3"
+                            placeholder="Notas internas, comentarios, etc. (opcional)">{{ old('observaciones', $editando ? $procesoEditar->observaciones ?? '' : '') }}</textarea>
+                    </div>
                     <div class="mt-6">
                         @php
                             $btn = $editando ? 'bg-yellow-600 hover:bg-yellow-800' : 'bg-blue-600 hover:bg-blue-800';
@@ -274,7 +278,7 @@
                                 <td class="px-4 py-2">
                                     @if ($proceso->estado === 'CREADO')
                                         <span class="px-2 py-1 text-xs rounded bg-amber-100 text-amber-700">
-                                            Proceso en selección
+                                            Proceso de selección
                                         </span>
                                     @else
                                         @if ($proceso->proponente)
