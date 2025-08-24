@@ -31,7 +31,7 @@ class PostulacionController extends Controller
             'estadoContrato',
             'tipoContrato'
         ])
-            ->where('estado', 'CREADO')
+
             ->orderByDesc('fecha')
             ->get();
 
@@ -46,37 +46,32 @@ class PostulacionController extends Controller
 
 
 
-    public function store(Request $request, $codigo)
+    public function store($codigo)
     {
-        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+        $miProponente = Proponente::where('user_id', auth()->id())->firstOrFail();
 
-        $proponente = Proponente::where('user_id', Auth::id())->first();
-        if (!$proponente) {
-            return back()->withErrors('Debes completar tu perfil de Proponente antes de postularte.');
+        $proceso = Proceso::with(['proponentesPostulados' => function ($q) use ($miProponente) {
+            $q->where('proponente_id', $miProponente->id);
+        }])->where('codigo', $codigo)->firstOrFail();
+
+        // ❌ Bloquear siempre si no está CREADO
+        if ($proceso->estado !== 'CREADO') {
+            return back()->withErrors('Este proceso no acepta postulaciones en su estado actual.');
         }
 
-        $request->validate([
-            'observacion' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        // ✅ Si YA existe, manda directo a archivos (idempotente)
-        if ($proceso->proponentesPostulados()
-            ->where('proponente_id', $proponente->id)
-            ->exists()
-        ) {
-            return redirect("/postulaciones/{$proceso->codigo}/archivos");
+        // Si ya estaba postulado, no crear duplicado
+        if ($proceso->proponentesPostulados->isNotEmpty()) {
+            return back()->withErrors('Ya te encuentras postulado a este proceso.');
         }
 
-        // Crear postulación
-        $proceso->proponentesPostulados()->attach($proponente->id, [
-            'estado' => 'POSTULADO',
-            'observacion' => $request->observacion,
+        $proceso->proponentesPostulados()->attach($miProponente->id, [
+            'estado' => 'ENVIADA',
+            'postulado_en' => now(),
         ]);
 
-        // ✅ Mismo destino que tu link
-        return redirect("/postulaciones/{$proceso->codigo}/archivos")
-            ->with('success', 'Postulación enviada. Ahora sube los documentos.');
+        return back()->with('success', 'Postulación registrada.');
     }
+
     public function archivosForm(string $codigo)
     {
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
@@ -117,13 +112,13 @@ class PostulacionController extends Controller
 
     // Retirar postulación
     // Retirar postulación
-public function destroy($codigo, Proponente $proponente)
-{
-    $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
-    $proceso->proponentesPostulados()->detach($proponente->id);
+    public function destroy($codigo, Proponente $proponente)
+    {
+        $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
+        $proceso->proponentesPostulados()->detach($proponente->id);
 
-    return redirect()->route('postulaciones.index')->with('success', 'Postulación retirada.');
-}
+        return redirect()->route('postulaciones.index')->with('success', 'Postulación retirada.');
+    }
 
 
     // Mostrar form de subida de archivos por requisito

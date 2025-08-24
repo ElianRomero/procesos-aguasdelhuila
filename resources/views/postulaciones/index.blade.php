@@ -25,7 +25,8 @@
             secop_url: '',
             requisitos: [],
             ya: false,
-            observaciones: ''
+            observaciones: '',
+            estado: ''
         },
         routeStore(codigo) {
             return `{{ route('postulaciones.store', ':codigo') }}`.replace(':codigo', encodeURIComponent(codigo));
@@ -55,7 +56,8 @@
                 link: p.link || '',
                 requisitos: Array.isArray(p.requisitos) ? p.requisitos : [],
                 ya: !!p.ya,
-                observaciones: p.observaciones || ''
+                observaciones: p.observaciones || '',
+                estado: p.estado || '',
             };
             this.det.secop_url = this.secopUrl(this.det.link);
             this.showDetalle = true;
@@ -186,6 +188,7 @@
     'requisitos' => $p->requisitos ?? [], // 👈 AÑADIDO
     'ya' => $ya, // 👈 AÑADIDO
     'observaciones' => $p->observaciones ?? '',
+    'estado' => $p->estado,
 ]))">
                                     {{ $p->codigo }}
                                 </button>
@@ -193,12 +196,6 @@
                             <td>{{ \Illuminate\Support\Str::limit($p->objeto, 120) }}</td>
                             <td>${{ number_format($p->valor, 0, ',', '.') }}</td>
                             <td>{{ $p->fecha?->format('d/m/Y') }}</td>
-
-                            {{-- OJITO DETALLE --}}
-
-
-                            {{-- ACCIÓN (postular/retirar) --}}
-
                         </tr>
                     @endforeach
                 </tbody>
@@ -296,19 +293,37 @@
 
                     <!-- Acciones -->
                     <!-- Acciones -->
-                    <div class="mt-6 flex flex-wrap gap-3 items-center">
-                        <form :action="routeStore(det.codigo)" method="POST" class="inline"
-                            @submit="$event.target.querySelector('button[type=submit]').disabled = true">
-                            @csrf
-                            <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-                                <span x-text="det.ya ? 'Sí, Continuar' : 'Interesado'"></span>
-                            </button>
-                        </form>
+                  <div class="mt-6 flex flex-wrap gap-3 items-center">
+    {{-- CREADO → puede postularse --}}
+    <template x-if="det.estado === 'CREADO'">
+        <form :action="routeStore(det.codigo)" method="POST" class="inline"
+              @submit="$event.target.querySelector('button[type=submit]').disabled = true">
+            @csrf
+            <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                Interesado
+            </button>
+        </form>
+    </template>
 
-                        <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
-                            Cerrar
-                        </button>
-                    </div>
+    {{-- VIGENTE → sin postulaciones ni carga --}}
+    <template x-if="det.estado === 'VIGENTE'">
+        <span class="px-3 py-1 rounded bg-amber-100 text-amber-800 text-sm">
+            Etapa de selección — no se reciben postulaciones ni carga de documentos
+        </span>
+    </template>
+
+    {{-- CERRADO → cerrado --}}
+    <template x-if="det.estado === 'CERRADO'">
+        <span class="px-3 py-1 rounded bg-gray-200 text-gray-700 text-sm">
+            Proceso cerrado
+        </span>
+    </template>
+
+    <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+        Cerrar
+    </button>
+</div>
+
                 </div>
             </div>
 
