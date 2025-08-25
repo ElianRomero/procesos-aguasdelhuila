@@ -66,7 +66,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($postulaciones as $p)
+                        @foreach ($postulaciones as $p)
                             @php
                                 $prop = $p->proponente;
                                 $proc = $p->proceso;
@@ -106,7 +106,6 @@
 
                                 <td class="px-4 py-3">
                                     @if ($prop && $proc)
-                                        {{-- Pasa el proceso como query ?proceso=CODIGO --}}
                                         <a href="{{ route('proponentes.show', ['proponente' => $prop, 'proceso' => $proc->codigo]) }}"
                                             class="text-sm bg-gray-800 text-white px-3 py-2 rounded hover:bg-black inline-block">
                                             Ver detalle
@@ -120,13 +119,7 @@
                                     @endif
                                 </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                                    No hay postulaciones registradas.
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
@@ -154,7 +147,9 @@
                     [3, 'desc']
                 ], // por fecha
                 language: {
-                    url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json'
+                    url: 'https://cdn.datatables.net/plug-ins/2.0.8/i18n/es-ES.json',
+                    "emptyTable": "No hay postulaciones registradas."
+
                 },
                 dom: '<"flex flex-col md:flex-row md:items-center md:justify-between gap-3"f>rt<"flex items-center justify-between mt-4"lp>',
             });
