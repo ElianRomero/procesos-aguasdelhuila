@@ -12,7 +12,11 @@
     </style>
 
     <div x-data="{
+        /* --- UI --- */
         showDetalle: false,
+        showArchivosModal: false,
+    
+        /* --- DETALLE --- */
         det: {
             codigo: '',
             fecha: '',
@@ -26,25 +30,36 @@
             requisitos: [],
             ya: false,
             observaciones: '',
-            estado: ''
+            estado: '',
+            ventana_definida: false,
+            ventana_abierta: false,
+            ventana_abre_fmt: '',
+            ventana_cierra_fmt: '',
+            obs_create_url: '',
+            postular_url: '',
+            archivos_url: '',
         },
+    
+        /* --- ARCHIVOS (solo redirección) --- */
+        arch: { codigo: '', archivos_url: '' },
+    
         routeStore(codigo) {
             return `{{ route('postulaciones.store', ':codigo') }}`.replace(':codigo', encodeURIComponent(codigo));
         },
     
         secopUrl(idOrUrl) {
             if (!idOrUrl) return '';
-            // Si viene URL completa, intenta extraer numConstancia
             if (/^https?:\/\//i.test(idOrUrl)) {
                 const m = idOrUrl.match(/numConstancia=([^&]+)/i);
                 return m ?
                     `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(m[1])}` :
                     idOrUrl;
             }
-            // Si viene solo el ID (22-4-13368797)
             return `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(idOrUrl)}`;
         },
+    
         openDetalle(p) {
+            this.showArchivosModal = false; // cierra el otro modal
             this.det = {
                 codigo: p.codigo || '',
                 fecha: p.fecha || '',
@@ -58,11 +73,29 @@
                 ya: !!p.ya,
                 observaciones: p.observaciones || '',
                 estado: p.estado || '',
+                ventana_definida: !!p.ventana_definida,
+                ventana_abierta: !!p.ventana_abierta,
+                ventana_abre_fmt: p.ventana_abre_fmt || '',
+                ventana_cierra_fmt: p.ventana_cierra_fmt || '',
+                obs_create_url: p.obs_create_url || '',
+                postular_url: p.postular_url || '',
+                archivos_url: p.archivos_url || '',
+                secop_url: '',
             };
             this.det.secop_url = this.secopUrl(this.det.link);
             this.showDetalle = true;
-        }
+        },
+    
+        openArchivosModal(payload) {
+            this.showDetalle = false; // cierra el de detalle
+            this.arch = {
+                codigo: payload.codigo || '',
+                archivos_url: payload.archivos_url || '',
+            };
+            this.showArchivosModal = true;
+        },
     }">
+
 
 
 
@@ -84,70 +117,81 @@
                 <span class="text-sm text-gray-500">{{ $misPostulaciones->count() }} en total</span>
             </div>
             <div class="flex items-center justify-between mb-3">
-                <p class="text-xs font-semibold text-gray-500">Recuerda adjuntar los documetnos necesarios para tu proceso
-                    de interes.</p>
-
+                <p class="text-xs font-semibold text-gray-500">
+                    Recuerda adjuntar los documentos necesarios para tu proceso de interés.
+                </p>
             </div>
+
             @if ($misPostulaciones->isEmpty())
                 <div class="text-gray-500">Aún no te has postulado a ningún proceso.</div>
             @else
                 <div class="flex flex-wrap gap-2">
                     @foreach ($misPostulaciones as $mp)
                         @php
-                            // Estado original del pivote (postulación)
                             $pivot = $mp->proponentesPostulados->firstWhere('id', $miProponente->id)?->pivot ?? null;
-                            $estadoPivot = $pivot?->estado ?? 'POSTULADO';
+                            $ya = (bool) $pivot; // ya existe postulación
+                            $estadoPivot = strtoupper($pivot?->estado ?? 'POSTULADO');
 
-                            // Si el proceso ya está cerrado (estado global en la tabla procesos)
-                            // Si el proceso ya está cerrado (estado global en la tabla procesos)
-                            if (strtoupper($mp->estado) === 'CERRADO') {
+                            // estado visual + badge
+                            $estadoProceso = strtoupper($mp->estado ?? '');
+                            if ($estadoProceso === 'CERRADO') {
                                 $estadoVisual = 'CERRADO';
-                            }
-                            // Si me asignaron como proponente
-                            elseif ($mp->proponente_id === $miProponente->id) {
+                            } elseif ($mp->proponente_id === $miProponente->id) {
                                 $estadoVisual = 'ASIGNADO';
-                            }
-                            // Si no, dejo el estado normal del pivote
-                            else {
+                            } else {
                                 $estadoVisual = $estadoPivot;
                             }
-
-                            // 🔹 Sobrescribir visualmente POSTULADO por INTERESADO
                             if ($estadoVisual === 'POSTULADO') {
                                 $estadoVisual = 'INTERESADO';
                             }
 
-                            // Colores según estado visual
                             $badge = match ($estadoVisual) {
                                 'ASIGNADO' => 'bg-green-100 text-green-700',
                                 'CERRADO' => 'bg-gray-300 text-gray-700',
                                 'ACEPTADA', 'ACEPTADO' => 'bg-green-100 text-green-700',
                                 'RECHAZADA', 'RECHAZADO' => 'bg-red-100 text-red-700',
-                                default => 'bg-blue-100 text-blue-700', // INTERESADO u otros
+                                default => 'bg-blue-100 text-blue-700',
                             };
 
+                            // ✅ URL de gestión por CÓDIGO
+                            $archivosUrl = route('postulaciones.archivos.form', ['codigo' => $mp->codigo]);
                         @endphp
 
-                        <button type="button" class="px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-sm"
-                            @click="openDetalle(@js([
+                        <div class="flex items-center gap-2 mb-2">
+                            {{-- Chip: abre modal de detalle --}}
+                            <button type="button" class="px-3 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-sm"
+                                @click="openDetalle(@js([
     'codigo' => $mp->codigo,
     'objeto' => $mp->objeto,
     'valor' => '$' . number_format($mp->valor, 0, ',', '.'),
     'fecha' => optional($mp->fecha)->format('d/m/Y'),
     'estado' => $mp->estado,
-    'estadoPostulacion' => $estadoVisual, // 👈 este es el que mostramos
+    'estadoPostulacion' => $estadoVisual,
     'link' => $mp->link_secop,
     'tipo' => $mp->tipoProceso->nombre ?? '',
     'estado_contrato' => $mp->estadoContrato->nombre ?? '',
     'tipo_contrato' => $mp->tipoContrato->nombre ?? '',
 ]))" title="Ver detalle">
-                            <span class="font-medium">{{ $mp->codigo }}</span>
-                            <span class="ml-2 text-xs px-2 py-0.5 rounded {{ $badge }}">{{ $estadoVisual }}</span>
-                        </button>
+                                <span class="font-medium">{{ $mp->codigo }}</span>
+                                <span
+                                    class="ml-2 text-xs px-2 py-0.5 rounded {{ $badge }}">{{ $estadoVisual }}</span>
+                            </button>
+
+                            {{-- Botón: abre modal que solo redirige a la gestión de documentos --}}
+                            <button type="button"
+                                class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                                @click="openArchivosModal(@js([
+    'codigo' => $mp->codigo,
+    'archivos_url' => $archivosUrl,
+]))">
+                                Gestionar documentos
+                            </button>
+                        </div>
                     @endforeach
                 </div>
             @endif
         </div>
+
 
         {{-- Necesario para ocultar el modal hasta que Alpine cargue --}}
 
@@ -169,8 +213,14 @@
                             $pivotActual = $p->proponentesPostulados->firstWhere('id', $miProponente->id);
                             $ya = (bool) $pivotActual;
                             $estadoPost = $pivotActual?->pivot?->estado;
-                        @endphp
+                            $ventanaDef = $p->tieneVentanaObservaciones();
+                            $ventanaOpen = $p->ventanaObservacionesAbiertaYDefinida();
 
+                            $postularUrl = route('postulaciones.store', ['codigo' => $p->codigo]);
+
+                            $postulanteKey = $miProponente->slug ?? ($miProponente->codigo ?? $miProponente->id);
+                            $archivosUrl = route('postulaciones.archivos.form', ['codigo' => $postulanteKey]);
+                        @endphp
                         <tr>
                             <td>
                                 <button type="button" class="text-indigo-600 hover:underline"
@@ -180,15 +230,23 @@
     'valor' => '$' . number_format($p->valor, 0, ',', '.'),
     'fecha' => optional($p->fecha)->format('d/m/Y'),
     'estadoPostulacion' => $estadoPost,
-    'link' => $p->link_secop, // puede ser código SECOP o URL completa
+    'link' => $p->link_secop,
     'tipo' => $p->tipoProceso->nombre ?? '',
     'estado_contrato' => $p->estadoContrato->nombre ?? '',
     'tipo_contrato' => $p->tipoContrato->nombre ?? '',
     'modalidad' => $p->modalidad_codigo ?? '',
-    'requisitos' => $p->requisitos ?? [], // 👈 AÑADIDO
-    'ya' => $ya, // 👈 AÑADIDO
+    'requisitos' => $p->requisitos ?? [],
+    'ya' => $ya,
     'observaciones' => $p->observaciones ?? '',
     'estado' => $p->estado,
+
+    'ventana_definida' => $ventanaDef,
+    'ventana_abierta' => $ventanaOpen,
+    'ventana_abre_fmt' => optional($p->observaciones_abren_en)?->format('d/m/Y H:i'),
+    'ventana_cierra_fmt' => optional($p->observaciones_cierran_en)?->format('d/m/Y H:i'),
+    'obs_create_url' => route('procesos.observaciones.create', $p),
+    'postular_url' => $postularUrl,
+    'archivos_url' => $archivosUrl,
 ]))">
                                     {{ $p->codigo }}
                                 </button>
@@ -288,45 +346,119 @@
                         <h2 class="text-sm font-semibold">Observaciones</h2>
                         <p class="mt-2 whitespace-pre-line" x-text="det.observaciones"></p>
                     </div>
+                    <!-- Botón para ir al formulario -->
+                    <div class="mt-4">
+                        <!-- Solo si la ventana existe y está abierta -->
+                        <template x-if="det.ventana_definida && det.ventana_abierta">
+                            <a :href="det.obs_create_url"
+                                class="inline-flex items-center px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">
+                                Realizar Observación
+                            </a>
+                        </template>
+
+                        <!-- Si no hay ventana definida -->
+                        <template x-if="!det.ventana_definida">
+                            <div class="text-sm text-gray-700 bg-gray-100 border border-gray-200 rounded px-3 py-2">
+                                Aún no se ha habilitado un periodo de observaciones para este proceso.
+                            </div>
+                        </template>
+
+                        <!-- Si hay ventana definida pero no está activa -->
+                        <template x-if="det.ventana_definida && !det.ventana_abierta">
+                            <div class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                                Ventana no activa.
+                                <template x-if="det.ventana_abre_fmt && det.ventana_cierra_fmt">
+                                    <span> Disponible del <strong x-text="det.ventana_abre_fmt"></strong> al
+                                        <strong x-text="det.ventana_cierra_fmt"></strong>.</span>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
 
 
 
                     <!-- Acciones -->
                     <!-- Acciones -->
-                  <div class="mt-6 flex flex-wrap gap-3 items-center">
-    {{-- CREADO → puede postularse --}}
-    <template x-if="det.estado === 'CREADO'">
-        <form :action="routeStore(det.codigo)" method="POST" class="inline"
-              @submit="$event.target.querySelector('button[type=submit]').disabled = true">
-            @csrf
-            <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
-                Interesado
-            </button>
-        </form>
-    </template>
+                    <div class="mt-6 flex flex-wrap gap-3 items-center">
+                        {{-- CREADO → puede postularse --}}
+                        <template x-if="!det.ya && det.estado === 'CREADO'">
+                            <form :action="det.postular_url" method="POST" class="inline"
+                                @submit="$event.target.querySelector('button[type=submit]').disabled = true">
+                                @csrf
+                                <input type="hidden" name="redirect_to" :value="det.archivos_url">
+                                <button type="submit" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                                    Interesado
+                                </button>
+                            </form>
+                        </template>
 
-    {{-- VIGENTE → sin postulaciones ni carga --}}
-    <template x-if="det.estado === 'VIGENTE'">
-        <span class="px-3 py-1 rounded bg-amber-100 text-amber-800 text-sm">
-            Etapa de selección — no se reciben postulaciones ni carga de documentos
-        </span>
-    </template>
 
-    {{-- CERRADO → cerrado --}}
-    <template x-if="det.estado === 'CERRADO'">
-        <span class="px-3 py-1 rounded bg-gray-200 text-gray-700 text-sm">
-            Proceso cerrado
-        </span>
-    </template>
 
-    <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
-        Cerrar
-    </button>
-</div>
+                        {{-- VIGENTE → sin postulaciones ni carga --}}
+                        <template x-if="det.estado === 'VIGENTE'">
+                            <span class="px-3 py-1 rounded bg-amber-100 text-amber-800 text-sm">
+                                Etapa de selección — no se reciben postulaciones ni carga de documentos
+                            </span>
+                        </template>
+
+                        {{-- CERRADO → cerrado --}}
+                        <template x-if="det.estado === 'CERRADO'">
+                            <span class="px-3 py-1 rounded bg-gray-200 text-gray-700 text-sm">
+                                Proceso cerrado
+                            </span>
+                        </template>
+
+                        <button @click="showDetalle=false" class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+                            Cerrar
+                        </button>
+                    </div>
 
                 </div>
             </div>
 
+        </div>
+        <!-- Modal Subir Documentos -->
+        <div x-show="showArchivosModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-5" @click.outside="showArchivosModal=false">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-semibold">Subir documentos</h3>
+                    <button class="text-gray-500 hover:text-gray-700" @click="showArchivosModal=false">✕</button>
+                </div>
+
+                <p class="text-sm text-gray-600 mb-4">
+                    Proceso <span class="font-medium" x-text="arch.codigo"></span>.
+                    Adjunta los documentos requeridos para tu postulación.
+                </p>
+
+                <!-- Si YA hay postulación: ir directo al form de archivos -->
+                <template x-if="arch.ya">
+                    <div class="space-y-3">
+                        <a :href="arch.archivos_url"
+                            class="w-full inline-flex justify-center px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white">
+                            Ir a mis archivos
+                        </a>
+                        <p class="text-xs text-gray-500">
+                            Ya estás postulado. Allí podrás adjuntar o eliminar documentos.
+                        </p>
+                    </div>
+                </template>
+
+                <!-- Si NO hay postulación: crearla y redirigir al form -->
+                <template x-if="!arch.ya">
+                    <form :action="arch.postular_url" method="POST" class="space-y-3"
+                        @submit="$event.target.querySelector('button[type=submit]').disabled = true">
+                        @csrf
+                        <input type="hidden" name="redirect_to" :value="arch.archivos_url">
+                        <button type="submit"
+                            class="w-full inline-flex justify-center px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">
+                            Me interesa y subir documentos
+                        </button>
+                        <p class="text-xs text-gray-500">
+                            Primero registraremos tu interés y luego te llevaremos al formulario para adjuntar documentos.
+                        </p>
+                    </form>
+                </template>
+            </div>
         </div>
 
 

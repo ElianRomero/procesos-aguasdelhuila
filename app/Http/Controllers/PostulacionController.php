@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
 class PostulacionController extends Controller
 
 {
-    public function index()
+     public function index()
     {
         $miProponente = Proponente::where('user_id', auth()->id())->first();
 
@@ -46,31 +46,39 @@ class PostulacionController extends Controller
 
 
 
-    public function store($codigo)
+    public function store(Request $request, \App\Models\Proceso $proceso = null, $codigo = null)
     {
-        $miProponente = Proponente::where('user_id', auth()->id())->firstOrFail();
+        // Si usas $codigo string (como mostraste):
+        if (!$proceso && $codigo !== null) {
+            $proceso = \App\Models\Proceso::where('codigo', $codigo)->firstOrFail();
+        }
 
-        $proceso = Proceso::with(['proponentesPostulados' => function ($q) use ($miProponente) {
-            $q->where('proponente_id', $miProponente->id);
-        }])->where('codigo', $codigo)->firstOrFail();
+        $miProponente = \App\Models\Proponente::where('user_id', auth()->id())->firstOrFail();
 
-        // ❌ Bloquear siempre si no está CREADO
         if ($proceso->estado !== 'CREADO') {
             return back()->withErrors('Este proceso no acepta postulaciones en su estado actual.');
         }
 
-        // Si ya estaba postulado, no crear duplicado
-        if ($proceso->proponentesPostulados->isNotEmpty()) {
+        if ($proceso->proponentesPostulados()->where('proponente_id', $miProponente->id)->exists()) {
             return back()->withErrors('Ya te encuentras postulado a este proceso.');
         }
 
         $proceso->proponentesPostulados()->attach($miProponente->id, [
-            'estado' => 'ENVIADA',
+            // usa el valor válido para tu columna (texto o tinyint)
+            'estado' => 'ENVIADA',        // o 1 si tu columna es tinyint
             'postulado_en' => now(),
         ]);
 
-        return back()->with('success', 'Postulación registrada.');
+        // Redirigir al form de archivos
+        $redirect = $request->input('redirect_to');
+        if (!$redirect) {
+            $postulanteKey = $miProponente->slug ?? $miProponente->codigo ?? $miProponente->id;
+            $redirect = route('postulaciones.archivos.form', ['codigo' => $postulanteKey]);
+        }
+
+        return redirect()->to($redirect)->with('ok', 'Postulación registrada. Sube tus documentos.');
     }
+
 
     public function archivosForm(string $codigo)
     {
@@ -176,13 +184,7 @@ class PostulacionController extends Controller
             );
         }
 
-        // (Opcional) si quieres que subir archivos automáticamente cree la postulación:
-        // if (! $proceso->proponentesPostulados()->where('proponente_id', $proponente->id)->exists()) {
-        //     $proceso->proponentesPostulados()->attach($proponente->id, [
-        //         'estado' => 'POSTULADO',
-        //         'observacion' => null,
-        //     ]);
-        // }
+
 
         return back()->with('success', 'Archivos guardados correctamente.');
     }
@@ -200,8 +202,7 @@ class PostulacionController extends Controller
             ->where('requisito_key', $key)
             ->firstOrFail();
 
-        // (Si quieres permitir admins, añade una condición con tu gate/policy)
-        // if (! (Auth::user()->can('isAdmin') || $archivo->proponente_id === $proponente->id)) abort(403);
+
 
         $abs = Storage::disk('private')->path($archivo->path);
 
