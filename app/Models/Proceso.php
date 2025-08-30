@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Proceso extends Model
 {
-     protected $table = 'procesos';
+    protected $table = 'procesos';
 
     protected $primaryKey = 'codigo';
     public $incrementing = false;
@@ -17,7 +17,7 @@ class Proceso extends Model
         'objeto',
         'link_secop',
         'valor',
-        'fecha',
+        'fecha' => 'datetime:Y-m-d',
         'tipo_proceso_codigo',
         'estado_contrato_codigo',
         'tipo_contrato_codigo',
