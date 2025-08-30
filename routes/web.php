@@ -132,6 +132,6 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/observaciones/{observacion}/archivos/{archivo}', [ObservacionController::class, 'destroyArchivo'])
         ->name('observaciones.archivos.destroy');
 });
-Route::get('/embed/tabla-procesos', [EmbedController::class, 'tablaProcesos']);
+Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
 
 require __DIR__ . '/auth.php';
