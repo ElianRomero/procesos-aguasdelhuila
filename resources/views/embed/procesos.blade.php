@@ -194,7 +194,7 @@
                 },
                 {
                     data: null,
-                    title: 'Interesado',
+                    title: 'Acceso',
                     orderable: false,
                     searchable: false,
                     className: 'dt-center',
