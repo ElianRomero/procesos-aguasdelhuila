@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminPostulacionesController;
+use App\Http\Controllers\EmbedController;
 use App\Http\Controllers\ObservacionController;
 use App\Http\Controllers\ParametrosContratoController;
 use App\Http\Controllers\ProcesoController;
@@ -131,5 +132,6 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/observaciones/{observacion}/archivos/{archivo}', [ObservacionController::class, 'destroyArchivo'])
         ->name('observaciones.archivos.destroy');
 });
+Route::get('/embed/tabla-procesos', [EmbedController::class, 'tablaProcesos']);
 
 require __DIR__ . '/auth.php';
