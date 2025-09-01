@@ -179,5 +179,9 @@ Route::middleware('web')->group(function () {
         ]);
     })->withoutMiddleware([VerifyCsrfToken::class]);
 });
+Route::get('/ping', function () {
+    session()->put('ts', now()->toDateTimeString());
+    return ['session'=>session('ts'), 'csrf'=>csrf_token()];
+});
 
 require __DIR__ . '/auth.php';
