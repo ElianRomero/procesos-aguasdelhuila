@@ -133,5 +133,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('observaciones.archivos.destroy');
 });
 Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
+Route::get('/_phpver', function () {
+    return response()->json(['php_fpm' => PHP_VERSION, 'sapi' => php_sapi_name()]);
+});
 
 require __DIR__ . '/auth.php';
