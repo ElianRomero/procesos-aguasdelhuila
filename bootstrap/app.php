@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         ]);
 
-        // Grupo WEB (EXPLÍCITO: sesión + cookies + CSRF)
+        // Grupo WEB explícito: sesión + cookies + csrf
         $middleware->group('web', [
             \App\Http\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,

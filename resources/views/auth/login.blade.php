@@ -62,40 +62,41 @@
                             }, 2000);
                         </script>
                     @endif
-                   <form method="POST" action="{{ route('login') }}" class="flex flex-col pt-3 md:pt-8">
-    @csrf
+                    <form method="POST" action="{{ route('login') }}" class="flex flex-col pt-3 md:pt-8">
+                        @csrf
 
-    <!-- Usuario -->
-    <div class="flex flex-col pt-4">
-        <label for="email" class="text-lg">Usuario</label>
-        <x-text-input type="email" id="email" name="email" :value="old('email')" required
-            autofocus autocomplete="username" placeholder="ejemplo@email.com" />
-    </div>
+                        <!-- Usuario -->
+                        <div class="flex flex-col pt-4">
+                            <label for="email" class="text-lg">Usuario</label>
+                            <x-text-input type="email" id="email" name="email" :value="old('email')" required
+                                autofocus autocomplete="username" placeholder="ejemplo@email.com" />
+                        </div>
 
-    <!-- Contraseña -->
-    <div class="flex flex-col pt-4">
-        <label for="password" class="text-lg">Contraseña</label>
-        <x-text-input type="password" id="password" name="password" placeholder="*******" />
-    </div>
+                        <!-- Contraseña -->
+                        <div class="flex flex-col pt-4">
+                            <label for="password" class="text-lg">Contraseña</label>
+                            <x-text-input type="password" id="password" name="password" placeholder="*******" />
+                        </div>
 
-    <!-- Enlaces de Recuperar / Registro -->
-    <div class="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600 mt-8 mb-6 gap-2 sm:gap-0">
-        <a href="{{ route('password.request') }}"
-            class="hover:text-blue-700 transition duration-150 ease-in-out underline">
-            ¿Olvidaste tu contraseña?
-        </a>
-        <span class="hidden sm:inline mx-2">|</span>
-        <a href="{{ route('register') }}"
-            class="hover:text-blue-700 transition duration-150 ease-in-out underline font-semibold">
-            ¿No tienes una cuenta? Regístrate
-        </a>
-    </div>
+                        <!-- Enlaces de Recuperar / Registro -->
+                        <div
+                            class="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600 mt-8 mb-6 gap-2 sm:gap-0">
+                            <a href="{{ route('password.request') }}"
+                                class="hover:text-blue-700 transition duration-150 ease-in-out underline">
+                                ¿Olvidaste tu contraseña?
+                            </a>
+                            <span class="hidden sm:inline mx-2">|</span>
+                            <a href="{{ route('register') }}"
+                                class="hover:text-blue-700 transition duration-150 ease-in-out underline font-semibold">
+                                ¿No tienes una cuenta? Regístrate
+                            </a>
+                        </div>
 
-    <!-- Botón -->
-    <x-primary-button class="bg-black text-white text-center font-bold justify-center mt-10">
-        Ingresar
-    </x-primary-button>
-</form>
+                        <!-- Botón -->
+                        <x-primary-button class="bg-black text-white text-center font-bold justify-center mt-10">
+                            Ingresar
+                        </x-primary-button>
+                    </form>
 
                 </div>
             </div>
