@@ -10,6 +10,7 @@ use App\Http\Controllers\ProponenteController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PostulacionController;
 use App\Http\Controllers\VentanasObservacionesController;
+use Illuminate\Http\Request;
 
 Route::get('/', function () {
     return view('welcome');
@@ -136,5 +137,34 @@ Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.pr
 Route::get('/_phpver', function () {
     return response()->json(['php_fpm' => PHP_VERSION, 'sapi' => php_sapi_name()]);
 });
+Route::middleware('web')->group(function () {
+
+    // A) GET: genera csrf y escribe en sesión
+    Route::get('/_probe', function () {
+        $rand = uniqid('probe_', true);
+        session(['probe' => $rand]);
+
+        return response()->json([
+            'sid'        => session()->getId(),
+            'csrf'       => csrf_token(),
+            'probe'      => $rand,
+            'cookieName' => config('session.cookie'),
+            'domain'     => config('session.domain'),
+            'secure'     => config('session.secure'),
+            'same_site'  => config('session.same_site'),
+        ]);
+    });
+
+    // B) POST: valida csrf y lee lo que quedó en sesión
+    Route::post('/_probe', function (Request $req) {
+        return response()->json([
+            'sid'        => session()->getId(),
+            'probe'      => session('probe', 'NO_SESSION'),
+            '_token_in'  => $req->input('_token', 'NO_TOKEN_IN_REQUEST'),
+            'csrf_now'   => csrf_token(),
+        ]);
+    });
+});
+Route::get('/_probe/form', fn() => view('probe'))->middleware('web');
 
 require __DIR__ . '/auth.php';
