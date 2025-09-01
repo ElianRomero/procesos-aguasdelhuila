@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PostulacionController;
 use App\Http\Controllers\VentanasObservacionesController;
 use Illuminate\Http\Request;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -134,12 +136,20 @@ Route::middleware(['auth'])->group(function () {
         ->name('observaciones.archivos.destroy');
 });
 Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
+/*
+ |— Diagnóstico PHP FPM
+*/
 Route::get('/_phpver', function () {
     return response()->json(['php_fpm' => PHP_VERSION, 'sapi' => php_sapi_name()]);
-});
+})->middleware('web');
+
+/*
+ |— PROBE de sesión/CSRF
+ |  (GET fija sesión, POST la lee)
+*/
 Route::middleware('web')->group(function () {
 
-    // A) GET: genera csrf y escribe en sesión
+    // GET: fija algo en sesión y devuelve info
     Route::get('/_probe', function () {
         $rand = uniqid('probe_', true);
         session(['probe' => $rand]);
@@ -152,19 +162,22 @@ Route::middleware('web')->group(function () {
             'domain'     => config('session.domain'),
             'secure'     => config('session.secure'),
             'same_site'  => config('session.same_site'),
-        ]);
+        ])->header('Cache-Control','no-store, no-cache, must-revalidate, max-age=0')
+          ->header('Pragma','no-cache')
+          ->header('Expires','0')
+          ->header('X-LiteSpeed-Cache-Control','no-cache');
     });
 
-    // B) POST: valida csrf y lee lo que quedó en sesión
+    // Vista con formulario POST
+    Route::view('/_probe/form', 'probe');
+
+    // POST: lee lo que quedó en sesión (CSRF DESACTIVADO solo aquí para probar)
     Route::post('/_probe', function (Request $req) {
         return response()->json([
-            'sid'        => session()->getId(),
-            'probe'      => session('probe', 'NO_SESSION'),
-            '_token_in'  => $req->input('_token', 'NO_TOKEN_IN_REQUEST'),
-            'csrf_now'   => csrf_token(),
+            'sid'   => session()->getId(),
+            'probe' => session('probe', 'NO_SESSION'),
         ]);
-    });
+    })->withoutMiddleware([VerifyCsrfToken::class]);
 });
-Route::get('/_probe/form', fn() => view('probe'))->middleware('web');
 
 require __DIR__ . '/auth.php';
