@@ -1,7 +1,10 @@
 <?php
 
+use App\Http\Controllers\AdminExpedientesController;
 use App\Http\Controllers\AdminPostulacionesController;
+use App\Http\Controllers\AdminPostulacionesDocsController;
 use App\Http\Controllers\EmbedController;
+use App\Http\Controllers\NoticiaController;
 use App\Http\Controllers\ObservacionController;
 use App\Http\Controllers\ParametrosContratoController;
 use App\Http\Controllers\ProcesoController;
@@ -135,10 +138,91 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/observaciones/{observacion}/archivos/{archivo}', [ObservacionController::class, 'destroyArchivo'])
         ->name('observaciones.archivos.destroy');
 });
-Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
+
+
+
+
 /*
- |— Diagnóstico PHP FPM
+ |— VerNoticias-----------------------------------------------------------------------------------------------------------------------------
 */
+
+Route::middleware('auth')->post(
+    '/procesos/{proceso}/noticias/{noticia}/leer',
+    [NoticiaController::class, 'marcarLeida']
+)->name('procesos.noticias.leer');
+
+/* ——— Público (sin login): solo noticias públicas del proceso ——— */
+Route::get('/public/procesos/{proceso}/noticias', [NoticiaController::class, 'index'])
+    ->name('public.procesos.noticias.index');
+
+/* ——— Autenticado (proponente/admin): ven lo visible para el usuario ——— */
+Route::middleware('auth')->group(function () {
+    Route::get('/procesos/{proceso}/noticias', [NoticiaController::class, 'index'])
+        ->name('procesos.noticias.index');
+
+    Route::get('/procesos/{proceso}/noticias/{noticia}', [NoticiaController::class, 'show'])
+        ->name('procesos.noticias.show');
+});
+
+/* ——— Solo ADMIN ——— */
+// Global (listado DataTables)
+Route::middleware(['auth', 'can:isAdmin'])->group(function () {
+    Route::get('/admin/noticias', [NoticiaController::class, 'adminNoticiasIndex'])
+        ->name('admin.noticias.index');
+
+    Route::get('/admin/noticias/data', [NoticiaController::class, 'adminNoticiasData'])
+        ->name('admin.noticias.data');
+
+    // Crear noticia global (eliges el proceso en el formulario)
+    Route::get('/admin/noticias/create', [NoticiaController::class, 'adminCreate'])
+        ->name('admin.noticias.create');
+
+    Route::post('/admin/noticias', [NoticiaController::class, 'adminStore'])
+        ->name('admin.noticias.store');
+
+    // Auxiliares AJAX
+    Route::get('/admin/procesos/buscar', [NoticiaController::class, 'adminProcesosSearch'])
+        ->name('admin.procesos.buscar');
+
+    Route::get('/admin/procesos/{proceso}/proponentes', [NoticiaController::class, 'adminProponentesByProceso'])
+        ->name('admin.procesos.proponentes');
+});
+
+
+/*
+ |— Ver procesos------------------------------------------------------------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'can:isProponente'])->group(function () {
+    // Listado global de noticias visibles para el proponente (públicas de sus procesos + privadas dirigidas a él)
+    Route::get('/mi/noticias', [NoticiaController::class, 'misNoticias'])
+        ->name('proponente.noticias.index');
+});
+Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function () {
+    // Vista única con DataTables
+    Route::get('/expedientes', [AdminExpedientesController::class, 'index'])
+        ->name('bo.expedientes.grid');
+
+    // JSON para DataTables (pares proponente-proceso con ≥1 doc)
+    Route::get('/expedientes/data', [AdminExpedientesController::class, 'data'])
+        ->name('bo.expedientes.data');
+
+    // JSON de documentos por proponente + ?proceso=CODIGO (mismo controlador)
+    Route::get('/proponentes/{proponente}/docs', [AdminExpedientesController::class, 'docs'])
+        ->name('bo.expedientes.docs');
+
+    Route::get('/proponentes/{proponente}/registros', [AdminExpedientesController::class, 'docs'])
+        ->name('bo.expedientes.archivos');
+    // Stream/inline del archivo privado firmado
+    Route::get('/proponentes/{proponente}/stream/{path}', [AdminExpedientesController::class, 'stream'])
+        ->where('path','.*')
+        ->middleware('signed')
+        ->name('bo.expedientes.stream');
+        
+});
+
+
+Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
+
 Route::get('/_phpver', function () {
     return response()->json(['php_fpm' => PHP_VERSION, 'sapi' => php_sapi_name()]);
 })->middleware('web');
@@ -155,17 +239,17 @@ Route::middleware('web')->group(function () {
         session(['probe' => $rand]);
 
         return response()->json([
-            'sid'        => session()->getId(),
-            'csrf'       => csrf_token(),
-            'probe'      => $rand,
+            'sid' => session()->getId(),
+            'csrf' => csrf_token(),
+            'probe' => $rand,
             'cookieName' => config('session.cookie'),
-            'domain'     => config('session.domain'),
-            'secure'     => config('session.secure'),
-            'same_site'  => config('session.same_site'),
-        ])->header('Cache-Control','no-store, no-cache, must-revalidate, max-age=0')
-          ->header('Pragma','no-cache')
-          ->header('Expires','0')
-          ->header('X-LiteSpeed-Cache-Control','no-cache');
+            'domain' => config('session.domain'),
+            'secure' => config('session.secure'),
+            'same_site' => config('session.same_site'),
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', '0')
+            ->header('X-LiteSpeed-Cache-Control', 'no-cache');
     });
 
     // Vista con formulario POST
@@ -174,14 +258,14 @@ Route::middleware('web')->group(function () {
     // POST: lee lo que quedó en sesión (CSRF DESACTIVADO solo aquí para probar)
     Route::post('/_probe', function (Request $req) {
         return response()->json([
-            'sid'   => session()->getId(),
+            'sid' => session()->getId(),
             'probe' => session('probe', 'NO_SESSION'),
         ]);
     })->withoutMiddleware([VerifyCsrfToken::class]);
 });
 Route::get('/ping', function () {
     session()->put('ts', now()->toDateTimeString());
-    return ['session'=>session('ts'), 'csrf'=>csrf_token()];
+    return ['session' => session('ts'), 'csrf' => csrf_token()];
 });
 
 require __DIR__ . '/auth.php';

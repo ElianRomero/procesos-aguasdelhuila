@@ -86,10 +86,13 @@
                                 </td>
 
                                 <td class="px-4 py-3 text-sm">
-                                    <div>{{ $prop->telefono1 ?? '—' }}{{ $prop->telefono2 ? ' / ' . $prop->telefono2 : '' }}
+                                    <div>
+                                        {{ $prop?->telefono1 ?? '—' }}
+                                        {{ $prop?->telefono2 ? ' / ' . $prop?->telefono2 : '' }}
                                     </div>
-                                    <div class="text-xs text-gray-500">{{ $prop->correo ?? '—' }}</div>
+                                    <div class="text-xs text-gray-500">{{ $prop?->correo ?? '—' }}</div>
                                 </td>
+
 
                                 <td class="px-4 py-3 text-sm">
                                     <div class="font-medium">#{{ $proc->codigo ?? '—' }}</div>

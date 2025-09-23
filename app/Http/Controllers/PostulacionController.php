@@ -11,9 +11,8 @@ use App\Models\PostulacionArchivo;
 use Illuminate\Support\Facades\Storage;
 
 class PostulacionController extends Controller
-
 {
-     public function index()
+    public function index()
     {
         $miProponente = Proponente::where('user_id', auth()->id())->first();
 
@@ -173,20 +172,20 @@ class PostulacionController extends Controller
             PostulacionArchivo::updateOrCreate(
                 [
                     'proceso_codigo' => $proceso->codigo,
-                    'proponente_id'  => $proponente->id,
-                    'requisito_key'  => $k,
+                    'proponente_id' => $proponente->id,
+                    'requisito_key' => $k,
                 ],
                 [
                     'original_name' => $file->getClientOriginalName(),
-                    'path'          => $path,
-                    'size_bytes'    => $file->getSize(),
+                    'path' => $path,
+                    'size_bytes' => $file->getSize(),
                 ]
             );
         }
 
 
 
-        return back()->with('success', 'Archivos guardados correctamente.');
+        return back()->with('toast_success', 'La documentación ha sido enviada.');
     }
 
     // Ver/descargar un archivo subido (protegido)
@@ -195,7 +194,8 @@ class PostulacionController extends Controller
         $proceso = Proceso::where('codigo', $codigo)->firstOrFail();
 
         $proponente = Proponente::where('user_id', Auth::id())->first();
-        if (!$proponente) abort(403);
+        if (!$proponente)
+            abort(403);
 
         $archivo = PostulacionArchivo::where('proceso_codigo', $codigo)
             ->where('proponente_id', $proponente->id) // solo el dueño
@@ -207,7 +207,7 @@ class PostulacionController extends Controller
         $abs = Storage::disk('private')->path($archivo->path);
 
         return response()->file($abs, [
-            'Content-Type'        => 'application/pdf',
+            'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $archivo->original_name . '"',
         ]);
     }

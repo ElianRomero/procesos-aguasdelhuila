@@ -40,6 +40,7 @@
                             <span class="text-sm font-medium text-black">Observaciones</span>
                         </a>
                     </li>
+                    {{-- <x-proponente.widget-noticias limit="3" /> --}}
                 @endif
 
                 {{-- 🛠 Opciones para Administrador (rol_id = 1) --}}
@@ -92,6 +93,35 @@
                             <span class="text-sm font-medium text-black">Observaciones</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ route('bo.expedientes.grid') }}"
+                            class="flex flex-row items-center h-12 transform hover:translate-x-2 transition-transform ease-in duration-200 text-gray-500 hover:text-gray-800">
+                            <span class="inline-flex items-center justify-center h-12 w-12 text-lg text-black">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                                    class="bi bi-files" viewBox="0 0 16 16">
+                                    <path
+                                        d="M13 0H6a2 2 0 0 0-2 2 2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2 2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m0 13V4a2 2 0 0 0-2-2H5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M3 4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+                                </svg>
+                            </span>
+                            <span class="text-sm font-medium text-black">Propuestas</span>
+                        </a>
+                    </li>
+                    {{-- <li>
+                        <a href="{{ route('bo.expedientes.grid') }}"
+                            class="flex flex-row items-center h-12 transform hover:translate-x-2 transition-transform ease-in duration-200 text-gray-500 hover:text-gray-800">
+                            <span class="inline-flex items-center justify-center h-12 w-12 text-lg text-black">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+                                    class="bi bi-newspaper"
+                                    viewBox="0 0 16 16">
+                                    <path
+                                        d="M0 2.5A1.5 1.5 0 0 1 1.5 1h11A1.5 1.5 0 0 1 14 2.5v10.528c0 .3-.05.654-.238.972h.738a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 1 1 0v9a1.5 1.5 0 0 1-1.5 1.5H1.497A1.497 1.497 0 0 1 0 13.5zM12 14c.37 0 .654-.211.853-.441.092-.106.147-.279.147-.531V2.5a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5v11c0 .278.223.5.497.5z" />
+                                    <path
+                                        d="M2 3h10v2H2zm0 3h4v3H2zm0 4h4v1H2zm0 2h4v1H2zm5-6h2v1H7zm3 0h2v1h-2zM7 8h2v1H7zm3 0h2v1h-2zm-3 2h2v1H7zm3 0h2v1h-2zm-3 2h2v1H7zm3 0h2v1h-2z" />
+                                </svg>
+                            </span>
+                            <span class="text-sm font-medium text-black">Noticias</span>
+                        </a>
+                    </li> --}}
                 @endif
 
             </ul>

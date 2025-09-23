@@ -93,7 +93,8 @@ class Proceso extends Model
     // ¿la ventana está abierta y además está definida?
     public function ventanaObservacionesAbiertaYDefinida(): bool
     {
-        if (!$this->tieneVentanaObservaciones()) return false;
+        if (!$this->tieneVentanaObservaciones())
+            return false;
         return now()->between($this->observaciones_abren_en, $this->observaciones_cierran_en);
     }
 
@@ -104,4 +105,9 @@ class Proceso extends Model
         // Ahora lo hacemos consistente: solo true si está definida y abierta.
         return $this->ventanaObservacionesAbiertaYDefinida();
     }
+    public function noticias()
+    {
+        return $this->hasMany(Noticia::class, 'proceso_codigo', 'codigo')->latest('publicada_en');
+    }
+
 }
