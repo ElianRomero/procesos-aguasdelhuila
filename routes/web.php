@@ -223,49 +223,5 @@ Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function
 
 Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
 
-Route::get('/_phpver', function () {
-    return response()->json(['php_fpm' => PHP_VERSION, 'sapi' => php_sapi_name()]);
-})->middleware('web');
-
-/*
- |— PROBE de sesión/CSRF
- |  (GET fija sesión, POST la lee)
-*/
-Route::middleware('web')->group(function () {
-
-    // GET: fija algo en sesión y devuelve info
-    Route::get('/_probe', function () {
-        $rand = uniqid('probe_', true);
-        session(['probe' => $rand]);
-
-        return response()->json([
-            'sid' => session()->getId(),
-            'csrf' => csrf_token(),
-            'probe' => $rand,
-            'cookieName' => config('session.cookie'),
-            'domain' => config('session.domain'),
-            'secure' => config('session.secure'),
-            'same_site' => config('session.same_site'),
-        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-            ->header('Pragma', 'no-cache')
-            ->header('Expires', '0')
-            ->header('X-LiteSpeed-Cache-Control', 'no-cache');
-    });
-
-    // Vista con formulario POST
-    Route::view('/_probe/form', 'probe');
-
-    // POST: lee lo que quedó en sesión (CSRF DESACTIVADO solo aquí para probar)
-    Route::post('/_probe', function (Request $req) {
-        return response()->json([
-            'sid' => session()->getId(),
-            'probe' => session('probe', 'NO_SESSION'),
-        ]);
-    })->withoutMiddleware([VerifyCsrfToken::class]);
-});
-Route::get('/ping', function () {
-    session()->put('ts', now()->toDateTimeString());
-    return ['session' => session('ts'), 'csrf' => csrf_token()];
-});
 
 require __DIR__ . '/auth.php';
