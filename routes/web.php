@@ -188,15 +188,41 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
         ->name('admin.procesos.proponentes');
 });
 
+Route::middleware(['auth', 'can:isProponente'])->group(function () {
+    Route::get('/mi/noticias', [NoticiaController::class, 'misNoticias'])
+        ->name('proponente.noticias.index');
+});
+
+// Responder (crear comentario)
+Route::middleware('auth')->post(
+    '/procesos/{proceso}/noticias/{noticia}/comentarios',
+    [NoticiaController::class, 'comentariosStore']
+)->name('procesos.noticias.comentarios.store');
+
+// Borrar comentario (dueño o admin)
+Route::middleware('auth')->delete(
+    '/procesos/{proceso}/noticias/{noticia}/comentarios/{comentario}',
+    [NoticiaController::class, 'comentariosDestroy']
+)->name('procesos.noticias.comentarios.destroy');
+// Rutas protegidas para ver/descargar adjuntos
+Route::middleware('auth')->group(function () {
+    // Adjuntos de la NOTICIA
+    Route::get(
+        '/procesos/{proceso}/noticias/{noticia}/archivos/{archivo}',
+        [NoticiaController::class, 'verArchivoNoticia']
+    )->name('procesos.noticias.archivos.ver');
+
+    // Adjuntos de COMENTARIOS
+    Route::get(
+        '/procesos/{proceso}/noticias/{noticia}/comentarios/{comentario}/archivos/{archivo}',
+        [NoticiaController::class, 'verArchivoComentario']
+    )->name('procesos.noticias.comentarios.archivos.ver');
+});
 
 /*
  |— Ver procesos------------------------------------------------------------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'can:isProponente'])->group(function () {
-    // Listado global de noticias visibles para el proponente (públicas de sus procesos + privadas dirigidas a él)
-    Route::get('/mi/noticias', [NoticiaController::class, 'misNoticias'])
-        ->name('proponente.noticias.index');
-});
+
 Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function () {
     // Vista única con DataTables
     Route::get('/expedientes', [AdminExpedientesController::class, 'index'])
@@ -214,10 +240,10 @@ Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function
         ->name('bo.expedientes.archivos');
     // Stream/inline del archivo privado firmado
     Route::get('/proponentes/{proponente}/stream/{path}', [AdminExpedientesController::class, 'stream'])
-        ->where('path','.*')
+        ->where('path', '.*')
         ->middleware('signed')
         ->name('bo.expedientes.stream');
-        
+
 });
 
 

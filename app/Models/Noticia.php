@@ -97,5 +97,9 @@ class Noticia extends Model
     {
         return $this->hasOne(NoticiaLectura::class)->where('proponente_id', $proponenteId);
     }
+    public function comentarios()
+    {
+        return $this->hasMany(NoticiaComentario::class);
+    }
 
 }

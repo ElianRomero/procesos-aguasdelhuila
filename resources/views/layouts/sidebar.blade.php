@@ -40,7 +40,7 @@
                             <span class="text-sm font-medium text-black">Observaciones</span>
                         </a>
                     </li>
-                    {{-- <x-proponente.widget-noticias limit="3" /> --}}
+                   <x-proponente.widget-noticias limit="3" /> 
                 @endif
 
                 {{-- 🛠 Opciones para Administrador (rol_id = 1) --}}
@@ -106,8 +106,8 @@
                             <span class="text-sm font-medium text-black">Propuestas</span>
                         </a>
                     </li>
-                    {{-- <li>
-                        <a href="{{ route('bo.expedientes.grid') }}"
+                    <li>
+                        <a href="{{ route('admin.noticias.index') }}"
                             class="flex flex-row items-center h-12 transform hover:translate-x-2 transition-transform ease-in duration-200 text-gray-500 hover:text-gray-800">
                             <span class="inline-flex items-center justify-center h-12 w-12 text-lg text-black">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
@@ -121,7 +121,7 @@
                             </span>
                             <span class="text-sm font-medium text-black">Noticias</span>
                         </a>
-                    </li> --}}
+                    </li> 
                 @endif
 
             </ul>

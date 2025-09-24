@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use App\Models\NoticiaLectura;
+use App\Models\NoticiaComentario;
+use App\Models\NoticiaComentarioArchivo;
+
 class NoticiaController extends Controller
 {
     use AuthorizesRequests;
@@ -108,7 +111,191 @@ class NoticiaController extends Controller
     public function show(Request $request, Proceso $proceso, Noticia $noticia)
     {
         $this->authorize('view', $noticia);
+
+        $noticia->load([
+            'archivos',
+            'comentarios' => function ($q) {
+                $q->whereNull('parent_id')
+                    ->with([
+                        'autor',
+                        'proponente',
+                        'archivos', // 👈 añade archivos del padre
+                        'children' => function ($c) {
+                            $c->with(['autor', 'proponente', 'archivos']) // 👈 añade archivos de hijos
+                                ->orderBy('created_at');
+                        }
+                    ])
+                    ->orderBy('created_at');
+            },
+        ]);
+
         return view('noticias.show', compact('proceso', 'noticia'));
+    }
+    public function verArchivoNoticia(Proceso $proceso, Noticia $noticia, NoticiaArchivo $archivo)
+    {
+        // 1) Integridad de la ruta
+        if ($noticia->proceso_codigo !== $proceso->codigo || $archivo->noticia_id !== $noticia->id) {
+            abort(404);
+        }
+
+        // 2) Permisos (misma policy que para ver la noticia)
+        $this->authorize('view', $noticia);
+
+        // 3) Servir el archivo (inline si es PDF/imagen)
+        $disk = Storage::disk($archivo->disk);
+        if (!$disk->exists($archivo->path))
+            abort(404);
+
+        $headers = [
+            'Content-Type' => $archivo->mime ?? 'application/octet-stream',
+            // inline para que el PDF/imagen se abra en el navegador
+            'Content-Disposition' => 'inline; filename="' . addslashes($archivo->original_name) . '"',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        // Si tu versión de Laravel soporta ->response():
+        if (method_exists($disk, 'response')) {
+            return $disk->response($archivo->path, $archivo->original_name, $headers);
+        }
+
+        // Fallback (descarga directa):
+        return response($disk->get($archivo->path), 200, $headers);
+    }
+
+    public function verArchivoComentario(
+        Proceso $proceso,
+        Noticia $noticia,
+        NoticiaComentario $comentario,
+        NoticiaComentarioArchivo $archivo
+    ) {
+        // 1) Integridad de la ruta
+        if (
+            $noticia->proceso_codigo !== $proceso->codigo ||
+            $comentario->noticia_id !== $noticia->id ||
+            $archivo->comentario_id !== $comentario->id
+        ) {
+            abort(404);
+        }
+
+        // 2) Permisos
+        $this->authorize('view', $noticia);
+
+        // 3) Servir el archivo
+        $disk = Storage::disk($archivo->disk);
+        if (!$disk->exists($archivo->path))
+            abort(404);
+
+        $headers = [
+            'Content-Type' => $archivo->mime ?? 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="' . addslashes($archivo->original_name) . '"',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        if (method_exists($disk, 'response')) {
+            return $disk->response($archivo->path, $archivo->original_name, $headers);
+        }
+
+        return response($disk->get($archivo->path), 200, $headers);
+    }
+
+
+    public function comentariosStore(Request $request, Proceso $proceso, Noticia $noticia)
+    {
+        $this->authorize('view', $noticia);
+
+        $data = $request->validate([
+            'cuerpo' => ['required', 'string', 'min:2', 'max:5000'],
+            'parent_id' => ['nullable', 'integer', 'exists:noticia_comentarios,id'],
+            // 50 MB por archivo (Laravel usa KB): 50*1024 = 51200
+            'archivos.*' => [
+                'nullable',
+                'file',
+                'max:51200',
+                'mimetypes:application/pdf,image/jpeg,image/png,image/webp,image/svg+xml'
+            ],
+        ]);
+
+        if (!empty($data['parent_id'])) {
+            $ok = NoticiaComentario::where('id', $data['parent_id'])
+                ->where('noticia_id', $noticia->id)->exists();
+            if (!$ok) {
+                return back()->withErrors(['parent_id' => 'La respuesta debe pertenecer a esta noticia.'])
+                    ->withInput();
+            }
+        }
+
+        // Límite recomendado de cantidad de archivos
+        $maxFiles = 5;
+        $files = $request->file('archivos', []);
+        if (is_array($files) && count($files) > $maxFiles) {
+            return back()->withErrors(['archivos' => "Máximo {$maxFiles} archivos por comentario."])
+                ->withInput();
+        }
+
+        $proponenteId = optional(optional($request->user())->proponente)->id;
+
+        $coment = NoticiaComentario::create([
+            'noticia_id' => $noticia->id,
+            'user_id' => $request->user()->id,
+            'proponente_id' => $proponenteId,
+            'parent_id' => $data['parent_id'] ?? null,
+            'cuerpo' => $data['cuerpo'],
+        ]);
+
+        // Guardar adjuntos
+        if ($files) {
+            $disk = $noticia->publico ? 'public' : 'private';
+            foreach ($files as $file) {
+                if (!$file)
+                    continue;
+                $path = $file->store("noticias/{$proceso->codigo}/comentarios/{$coment->id}", $disk);
+                NoticiaComentarioArchivo::create([
+                    'comentario_id' => $coment->id,
+                    'disk' => $disk,
+                    'path' => $path,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime' => $file->getClientMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+            }
+        }
+
+        // (opcional) marcar noticia como leída al comentar
+        if ($proponenteId) {
+            NoticiaLectura::updateOrCreate(
+                ['noticia_id' => $noticia->id, 'proponente_id' => $proponenteId],
+                ['read_at' => now()]
+            );
+        }
+
+        return redirect()
+            ->route('procesos.noticias.show', [$proceso, $noticia])
+            ->with('ok', 'Comentario publicado.')
+            ->withFragment('c' . $coment->id);
+    }
+
+
+    public function comentariosDestroy(Request $request, Proceso $proceso, Noticia $noticia, NoticiaComentario $comentario)
+    {
+        $this->authorize('view', $noticia);
+
+        $user = $request->user();
+        $isOwner = $comentario->user_id === $user->id;
+        $isAdmin = $user->can('isAdmin');
+
+        if (!$isOwner && !$isAdmin)
+            abort(403);
+        if ($comentario->noticia_id !== $noticia->id)
+            abort(404);
+
+        // borrar archivos
+        foreach ($comentario->archivos as $a) {
+            Storage::disk($a->disk)->delete($a->path);
+        }
+
+        $comentario->delete();
+
+        return back()->with('ok', 'Comentario eliminado.');
     }
 
     public function destroy(Request $request, Proceso $proceso, Noticia $noticia)
