@@ -46,18 +46,35 @@ class InvoicePaymentController extends Controller
         $s = trim(preg_replace('/\s{2,}/', ' ', $s));
         return mb_strimwidth($s, 0, $max, '', 'UTF-8');
     }
+    // 👇 Pon este helper dentro del mismo controlador (fuera del método)
+    private function appendPublicKeyToCheckoutUrl(string $url): string
+    {
+        $pub = config('services.wompi.public_key');
+        if (!$pub)
+            return $url;
+
+        $isCheckout = str_starts_with($url, 'https://checkout.wompi.co/');
+        if (!$isCheckout)
+            return $url;
+
+        $query = parse_url($url, PHP_URL_QUERY);
+        if ($query && str_contains($query, 'public-key=')) {
+            return $url;
+        }
+        $sep = $query ? '&' : '?';
+        return $url . $sep . 'public-key=' . $pub;
+    }
 
 
     public function createOrReuseLink(Request $request, string $refpago)
     {
         $invoice = Invoice::where('refpago', $refpago)->firstOrFail();
 
-        // Reusar si sigue activo
+        // Reusar link activo (añadiendo public-key por si acaso)
         if ($invoice->isPaymentLinkActive()) {
-            return redirect()->away($invoice->payment_link_url);
+            return redirect()->away($this->appendPublicKeyToCheckoutUrl($invoice->payment_link_url));
         }
 
-        // Validaciones previas
         if ($invoice->valfactura <= 0) {
             return back()->with('error', 'Esta factura tiene saldo cero/negativo. No es cobrable.');
         }
@@ -66,13 +83,13 @@ class InvoicePaymentController extends Controller
         $privateKey = config('services.wompi.private_key');
         $currency = 'COP';
 
+        // Sanitiza strings (usa tu helper cleanStr si ya lo tienes)
         $name = $this->cleanStr("Pago factura " . $invoice->refpago, 64);
         $description = $this->cleanStr("Factura de {$invoice->nombre} - {$invoice->direccion}", 180);
 
-        // Expiración en UTC (30 min) → ISO-8601
+        // Expiración en UTC (ISO-8601)
         $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
 
-        // HTTP client con reintentos/timeout
         $http = Http::withToken($privateKey)
             ->acceptJson()
             ->asJson()
@@ -81,25 +98,22 @@ class InvoicePaymentController extends Controller
 
         $maxAttempts = 2;
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            // Referencia única por intento
+
             $reference = 'INV-' . $invoice->refpago . '-' . Str::upper(Str::random(6));
 
-            // Payload requerido por Wompi (payment links)
             $payload = [
                 'name' => $name,
                 'description' => $description,
                 'single_use' => true,
-                'collect_shipping' => false,            // <- requerido
+                'collect_shipping' => false,                     // requerido
                 'currency' => $currency,
-                'amount_in_cents' => (int) $invoice->valfactura, // centavos
+                'amount_in_cents' => (int) $invoice->valfactura,
                 'reference' => $reference,
                 'expires_at' => $expiresAtUtc,
-                // 'redirect_url'   => route('pago.show', $invoice->refpago), // opcional
+                'redirect_url' => route('pago.show', ['refpago' => $invoice->refpago]),
                 'customer_data' => [
                     'full_name' => $this->cleanStr($invoice->nombre, 100),
                 ],
-                // 'image_url'     => asset('image/logo.png'), // opcional
-                // 'sku'           => 'INV-'.$invoice->refpago, // opcional
             ];
 
             try {
@@ -111,7 +125,6 @@ class InvoicePaymentController extends Controller
                     $paymentLinkUrl = data_get($data, 'data.url')
                         ?: data_get($data, 'data.payment_link_url');
 
-                    // Fallback con id
                     if (!$paymentLinkUrl && ($id = data_get($data, 'data.id'))) {
                         $paymentLinkUrl = 'https://checkout.wompi.co/l/' . $id;
                     }
@@ -121,7 +134,9 @@ class InvoicePaymentController extends Controller
                         return back()->with('error', 'No fue posible generar el enlace de pago (sin URL).');
                     }
 
-                    // Guardar en zona local (app.timezone)
+                    // Adjunta public-key para evitar /merchants/undefined en /summary
+                    $paymentLinkUrl = $this->appendPublicKeyToCheckoutUrl($paymentLinkUrl);
+
                     $invoice->update([
                         'payment_link_url' => $paymentLinkUrl,
                         'expires_at' => \Illuminate\Support\Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
@@ -132,19 +147,17 @@ class InvoicePaymentController extends Controller
                     return redirect()->away($paymentLinkUrl);
                 }
 
-                // 409/422 – validaciones o choque de referencia
+                // 409/422 → validaciones o conflicto de reference
                 if (in_array($resp->status(), [409, 422])) {
                     $body = $resp->json();
                     $messages = data_get($body, 'error.messages', []);
                     $flatMsg = is_array($messages) ? implode(' | ', collect($messages)->flatten()->all()) : ($messages ?: '');
 
-                    // Si menciona "reference", reintenta con nueva
                     if (stripos($flatMsg, 'reference') !== false) {
                         Log::warning('Wompi: conflicto/validación de reference, reintentando', ['messages' => $messages]);
-                        continue; // intenta siguiente loop con nueva reference
+                        continue; // probar con nueva referencia
                     }
 
-                    // Mostrar primer mensaje de validación legible
                     $firstField = is_array($messages) ? array_key_first($messages) : null;
                     $firstErr = $firstField && isset($messages[$firstField][0]) ? $messages[$firstField][0] : null;
                     $humanMsg = $firstErr ?: ($flatMsg ?: 'Error de validación con Wompi.');
@@ -157,7 +170,6 @@ class InvoicePaymentController extends Controller
                     return back()->with('error', $humanMsg);
                 }
 
-                // 429/5xx u otros
                 Log::error('Wompi payment_link error', ['status' => $resp->status(), 'body' => $resp->json()]);
                 return back()->with('error', 'No fue posible generar el enlace de pago en este momento. Intenta de nuevo.');
 
@@ -174,6 +186,7 @@ class InvoicePaymentController extends Controller
 
         return back()->with('error', 'No fue posible generar el enlace de pago. Intenta más tarde.');
     }
+
 
 
     // Webhook (notificación Wompi)
