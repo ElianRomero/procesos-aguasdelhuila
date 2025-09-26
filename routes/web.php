@@ -4,6 +4,9 @@ use App\Http\Controllers\AdminExpedientesController;
 use App\Http\Controllers\AdminPostulacionesController;
 use App\Http\Controllers\AdminPostulacionesDocsController;
 use App\Http\Controllers\EmbedController;
+use App\Http\Controllers\InvoiceImportController;
+use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\InvoicePaymenttController;
 use App\Http\Controllers\NoticiaController;
 use App\Http\Controllers\ObservacionController;
 use App\Http\Controllers\ParametrosContratoController;
@@ -186,6 +189,11 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 
     Route::get('/admin/procesos/{proceso}/proponentes', [NoticiaController::class, 'adminProponentesByProceso'])
         ->name('admin.procesos.proponentes');
+
+    Route::get('/admin/facturas/importar', [InvoiceImportController::class, 'form'])->name('invoices.import.form');
+    Route::post('/admin/facturas/importar', [InvoiceImportController::class, 'import'])->name('invoices.import');
+
+
 });
 
 Route::middleware(['auth', 'can:isProponente'])->group(function () {
@@ -244,10 +252,29 @@ Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function
         ->middleware('signed')
         ->name('bo.expedientes.stream');
 
+
+
 });
 
 
+
 Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
+
+
+
+/*
+ |—Pasarela de pagos WOMPI-----------------------------------------------------------------------------------------------------------------------------
+*/
+
+
+// Público / cliente:
+Route::get('/pago/buscar', [InvoicePaymentController::class, 'searchForm'])->name('pago.search.form');
+Route::get('/pago', [InvoicePaymentController::class, 'search'])->name('pago.search'); // ?refpago=123
+Route::get('/pago/{refpago}', [InvoicePaymentController::class, 'show'])->name('pago.show');
+Route::post('/pago/{refpago}/link', [InvoicePaymentController::class, 'createOrReuseLink'])->name('pago.link');
+
+// Webhook Wompi:
+Route::post('/webhook/wompi', [InvoicePaymentController::class, 'webhook'])->name('wompi.webhook');
 
 
 require __DIR__ . '/auth.php';

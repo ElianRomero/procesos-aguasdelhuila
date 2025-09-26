@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'wompi' => [
+        'base_url' => env('WOMPI_BASE_URL', 'https://production.wompi.co'),
+        'private_key' => env('WOMPI_PRIVATE_KEY'), 
+        'public_key' => env('WOMPI_PUBLIC_KEY'),
+    ],
+
 ];
