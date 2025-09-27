@@ -62,10 +62,10 @@ class InvoicePaymentController extends Controller
         }
         return $url;
     }
+
     private function normalizeCheckoutUrl(array $responseData): string
     {
-        // 1) Prioriza el id retornado por la API
-        $id = data_get($responseData, 'data.id');
+        $id = data_get($responseData, 'data.id');  // <- preferimos SIEMPRE el id
         $url = data_get($responseData, 'data.url')
             ?: data_get($responseData, 'data.payment_link_url')
             ?: '';
@@ -73,7 +73,6 @@ class InvoicePaymentController extends Controller
         if ($id) {
             $url = 'https://checkout.wompi.co/l/' . $id;
         } else {
-            // 2) Si no hay id, intenta extraerlo de la URL (si viniera /l/{id})
             if (preg_match('#/l/([A-Za-z0-9\-_]+)#', $url, $m)) {
                 $id = $m[1];
                 $url = 'https://checkout.wompi.co/l/' . $id;
@@ -81,80 +80,102 @@ class InvoicePaymentController extends Controller
         }
 
         if (!$url || !str_contains($url, '/l/')) {
-            // Si sigue siendo /summary o algo raro, tratamos como error explícito
             Log::error('Wompi no retornó id de link de pago', ['data' => $responseData]);
             throw new \RuntimeException('No fue posible generar el enlace de pago (sin id).');
         }
 
-        // (Opcional) adjunta public-key
         return $this->appendPublicKeyToCheckoutUrl($url);
     }
+
 
     public function createOrReuseLink(Request $request, string $refpago)
     {
         $invoice = Invoice::where('refpago', $refpago)->firstOrFail();
 
-        // Reusar si el link sigue activo
-        if ($invoice->isPaymentLinkActive()) {
-            return redirect()->away($this->appendPublicKeyToCheckoutUrl($invoice->payment_link_url));
-        }
-
-        // No cobrar valores <= 0
+        // ⚠️ No cobrar montos <= 0
         if ($invoice->valfactura <= 0) {
             return back()->with('error', 'Esta factura tiene saldo cero/negativo. No es cobrable.');
         }
 
-        $wompiBase = rtrim(config('services.wompi.base_url', 'https://production.wompi.co'), '/');
+        $wompiBase = rtrim(config('services.wompi.base_url', 'https://sandbox.wompi.co'), '/'); // Sandbox/Prod según .env
         $privateKey = config('services.wompi.private_key');
         $currency = 'COP';
 
-        // Sanitiza strings
+        // Reusar link activo, pero primero validar remotamente que siga "active"
+        if ($invoice->payment_link_url && $invoice->expires_at && now()->lt($invoice->expires_at)) {
+            // Extrae el {id} de .../l/{id}
+            if (preg_match('#/l/([A-Za-z0-9\-_]+)#', $invoice->payment_link_url, $m)) {
+                $id = $m[1];
+                $health = Http::retry(1, 200)->timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
+                if ($health->successful()) {
+                    $info = $health->json();
+                    $active = (bool) data_get($info, 'data.active');
+                    $mpk = data_get($info, 'data.merchant_public_key'); // debería venir
+                    if ($active && $mpk) {
+                        // ✅ Link aún sirve, reusar
+                        return redirect()->away('https://checkout.wompi.co/l/' . $id);
+                    }
+                }
+            }
+            // Si no está activo o no se pudo leer, seguimos y generamos uno nuevo
+        }
+
         $name = $this->cleanStr("Pago factura " . $invoice->refpago, 64);
         $description = $this->cleanStr("Factura de {$invoice->nombre} - {$invoice->direccion}", 180);
 
-        // Expiración en UTC (ISO-8601)
+        // Wompi pide expiración en **UTC** (ISO-8601 está OK). :contentReference[oaicite:2]{index=2}
         $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
 
         $http = Http::withToken($privateKey)
-            ->acceptJson()
-            ->asJson()
-            ->retry(2, 300)
-            ->timeout(15);
+            ->acceptJson()->asJson()
+            ->retry(2, 300)->timeout(15);
 
-        $maxAttempts = 2;
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+        // Hasta 2 intents por posible choque de reference
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
             $reference = 'INV-' . $invoice->refpago . '-' . Str::upper(Str::random(6));
 
             $payload = [
                 'name' => $name,
                 'description' => $description,
                 'single_use' => true,
-                'collect_shipping' => false,                      // requerido por la API
+                'collect_shipping' => false,           // requerido por API de Payment Links :contentReference[oaicite:3]{index=3}
                 'currency' => $currency,
-                'amount_in_cents' => (int) $invoice->valfactura, // centavos
+                'amount_in_cents' => (int) $invoice->valfactura,
                 'reference' => $reference,
                 'expires_at' => $expiresAtUtc,
                 'redirect_url' => route('pago.show', ['refpago' => $invoice->refpago]),
-                'customer_data' => [
-                    'full_name' => $this->cleanStr($invoice->nombre, 100),
-                ],
             ];
 
             try {
                 $resp = $http->post($wompiBase . '/v1/payment_links', $payload);
-
                 if ($resp->successful()) {
                     $data = $resp->json();
 
-                    // 🔐 Normaliza SIEMPRE a https://checkout.wompi.co/l/{id}
-                    try {
-                        $paymentLinkUrl = $this->normalizeCheckoutUrl($data);
-                    } catch (\Throwable $e) {
-                        Log::error('Normalización de URL de Wompi falló', ['exception' => $e->getMessage(), 'data' => $data]);
-                        return back()->with('error', 'No fue posible generar el enlace de pago (URL inválida).');
+                    // 🔑 Toma SIEMPRE el id de la respuesta y construye /l/{id}
+                    $id = data_get($data, 'data.id');
+                    if (!$id) {
+                        Log::error('Wompi: respuesta sin id', ['data' => $data]);
+                        return back()->with('error', 'No fue posible generar el enlace de pago (sin id).');
                     }
 
-                    // Guarda expiración en tu zona horaria
+                    // ✅ Verifica salud del link recién creado (debe traer merchant_public_key y active=true)
+                    $health = Http::retry(1, 200)->timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
+                    if (!$health->successful()) {
+                        Log::error('Wompi: GET payment_links/:id falló', ['id' => $id, 'status' => $health->status(), 'body' => $health->json()]);
+                        return back()->with('error', 'No fue posible validar el enlace de pago.');
+                    }
+                    $info = $health->json();
+                    $mpk = data_get($info, 'data.merchant_public_key');
+                    $active = (bool) data_get($info, 'data.active');
+
+                    if (!$mpk || !$active) {
+                        Log::error('Wompi: link sin merchant_public_key o inactivo', ['info' => $info]);
+                        return back()->with('error', 'El enlace de pago no quedó activado. Intenta de nuevo.');
+                    }
+
+                    $paymentLinkUrl = 'https://checkout.wompi.co/l/' . $id;
+
+                    // Guarda en tu zona horaria
                     $invoice->update([
                         'payment_link_url' => $paymentLinkUrl,
                         'expires_at' => \Illuminate\Support\Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
@@ -165,41 +186,26 @@ class InvoicePaymentController extends Controller
                     return redirect()->away($paymentLinkUrl);
                 }
 
-                // 409/422 → validación o reference duplicada
+                // 409/422 → valida mensajes (422 = INPUT_VALIDATION_ERROR) :contentReference[oaicite:4]{index=4}
                 if (in_array($resp->status(), [409, 422])) {
                     $body = $resp->json();
                     $messages = data_get($body, 'error.messages', []);
                     $flatMsg = is_array($messages) ? implode(' | ', collect($messages)->flatten()->all()) : ($messages ?: '');
-
-                    // Si es por 'reference', reintenta con otra
                     if (stripos($flatMsg, 'reference') !== false) {
-                        Log::warning('Wompi: conflicto/validación de reference, reintentando', ['messages' => $messages]);
-                        continue;
+                        Log::warning('Wompi: reference conflict, retrying', ['messages' => $messages]);
+                        continue; // intenta con nueva reference
                     }
-
-                    // Mostrar primer mensaje legible
                     $firstField = is_array($messages) ? array_key_first($messages) : null;
                     $firstErr = $firstField && isset($messages[$firstField][0]) ? $messages[$firstField][0] : null;
-                    $humanMsg = $firstErr ?: ($flatMsg ?: 'Error de validación con Wompi.');
-
-                    Log::error('Wompi payment_link validation error', [
-                        'status' => $resp->status(),
-                        'body' => $body,
-                        'payload' => $payload
-                    ]);
-                    return back()->with('error', $humanMsg);
+                    return back()->with('error', $firstErr ?: ($flatMsg ?: 'Error de validación con Wompi.'));
                 }
 
-                // Otros estados (429/5xx)
                 Log::error('Wompi payment_link error', ['status' => $resp->status(), 'body' => $resp->json()]);
                 return back()->with('error', 'No fue posible generar el enlace de pago en este momento. Intenta de nuevo.');
 
             } catch (\Throwable $e) {
-                Log::error('Excepción al crear payment_link Wompi', [
-                    'error' => $e->getMessage(),
-                    'attempt' => $attempt,
-                ]);
-                if ($attempt >= $maxAttempts) {
+                Log::error('Excepción Wompi', ['e' => $e->getMessage(), 'attempt' => $attempt]);
+                if ($attempt >= 2) {
                     return back()->with('error', 'Error interno al generar el enlace de pago.');
                 }
             }
