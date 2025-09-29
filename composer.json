@@ -11,7 +11,7 @@
         "laravel/sanctum": "^4.2",
         "laravel/tinker": "^2.10.1",
         "league/csv": "^9.25",
-        "setasign/fpdf": "1.8"
+        "setasign/fpdf": "1.8.6"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
