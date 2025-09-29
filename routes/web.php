@@ -19,6 +19,7 @@ use App\Http\Controllers\PostulacionController;
 use App\Http\Controllers\VentanasObservacionesController;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Http\Controllers\ProponentesOldController;
 
 
 Route::get('/', function () {
@@ -194,6 +195,11 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/admin/facturas/importar', [InvoiceImportController::class, 'form'])->name('invoices.import.form');
     Route::post('/admin/facturas/importar', [InvoiceImportController::class, 'import'])->name('invoices.import');
 
+    Route::get('/proponentes/old/crear', [ProponentesOldController::class, 'create'])
+        ->name('proponentes.old.create');
+
+    Route::post('/proponentes/old', [ProponentesOldController::class, 'store'])
+        ->name('proponentes.old.store');
 
 });
 
