@@ -8,6 +8,7 @@ use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\InvoicePaymenttController;
 use App\Http\Controllers\NoticiaController;
+use App\Http\Controllers\ProponentesCertificadosController;
 use App\Http\Controllers\ObservacionController;
 use App\Http\Controllers\ParametrosContratoController;
 use App\Http\Controllers\ProcesoController;
@@ -255,6 +256,23 @@ Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function
 
 
 });
+
+
+/*
+ |—-----------------------------------------------------------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/proponentes/certificados', [ProponentesCertificadosController::class, 'index'])
+        ->name('proponentes.certificados.index');
+
+    Route::get('/proponentes/certificados/data', [ProponentesCertificadosController::class, 'data'])
+        ->name('proponentes.certificados.data'); // ponla ANTES de la dinámica por claridad
+
+    Route::get('/proponentes/{id}/certificado', [ProponentesCertificadosController::class, 'download'])
+        ->name('proponentes.certificados.download');
+});
+
 
 
 
