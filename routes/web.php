@@ -298,7 +298,8 @@ Route::get('/pago/{refpago}', [InvoicePaymentController::class, 'show'])->name('
 Route::post('/pago/{refpago}/link', [InvoicePaymentController::class, 'createOrReuseLink'])->name('pago.link');
 
 // Webhook Wompi:
-Route::post('/webhook/wompi', [InvoicePaymentController::class, 'webhook'])->name('wompi.webhook');
+Route::post('/webhook/wompi', [InvoicePaymentController::class, 'webhook'])
+  ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 
 require __DIR__ . '/auth.php';

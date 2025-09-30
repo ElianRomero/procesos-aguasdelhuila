@@ -46,48 +46,7 @@ class InvoicePaymentController extends Controller
         $s = trim(preg_replace('/\s{2,}/', ' ', $s));
         return mb_strimwidth($s, 0, $max, '', 'UTF-8');
     }
-    // 👇 Pon este helper dentro del mismo controlador (fuera del método)
-    private function appendPublicKeyToCheckoutUrl(string $url): string
-    {
-        $pub = config('services.wompi.public_key');
-        if (!$pub)
-            return $url;
-
-        if (str_starts_with($url, 'https://checkout.wompi.co/')) {
-            $query = parse_url($url, PHP_URL_QUERY);
-            if (!$query || !str_contains($query, 'public-key=')) {
-                $sep = $query ? '&' : '?';
-                $url .= $sep . 'public-key=' . $pub;
-            }
-        }
-        return $url;
-    }
-
-    private function normalizeCheckoutUrl(array $responseData): string
-    {
-        $id = data_get($responseData, 'data.id');  // <- preferimos SIEMPRE el id
-        $url = data_get($responseData, 'data.url')
-            ?: data_get($responseData, 'data.payment_link_url')
-            ?: '';
-
-        if ($id) {
-            $url = 'https://checkout.wompi.co/l/' . $id;
-        } else {
-            if (preg_match('#/l/([A-Za-z0-9\-_]+)#', $url, $m)) {
-                $id = $m[1];
-                $url = 'https://checkout.wompi.co/l/' . $id;
-            }
-        }
-
-        if (!$url || !str_contains($url, '/l/')) {
-            Log::error('Wompi no retornó id de link de pago', ['data' => $responseData]);
-            throw new \RuntimeException('No fue posible generar el enlace de pago (sin id).');
-        }
-
-        return $this->appendPublicKeyToCheckoutUrl($url);
-    }
-
-
+   
     public function createOrReuseLink(Request $request, string $refpago)
     {
         $invoice = Invoice::where('refpago', $refpago)->firstOrFail();
