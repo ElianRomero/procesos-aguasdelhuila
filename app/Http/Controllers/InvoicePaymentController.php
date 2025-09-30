@@ -151,59 +151,73 @@ class InvoicePaymentController extends Controller
     // Webhook (notificación Wompi)
     public function webhook(Request $request)
     {
-        // Log crudo para depurar
         Log::info('Webhook ARRIVED', ['raw' => $request->getContent()]);
 
         $payload = json_decode($request->getContent(), true) ?? [];
 
-        // Firma obligatoria
-        if (!$this->verifyWompiSignature($request, $payload)) {
-            Log::warning('Wompi webhook: invalid signature');
-            return response('invalid signature', 400);
+        // 1) Verificación de firma (con bypass en local/dev/testing y logs en INFO)
+        $sigOk = $this->verifyWompiSignature($request, $payload);
+        if (!$sigOk) {
+            if (app()->environment(['local', 'development', 'testing'])) {
+                Log::info('SIGDEBUG: firma inválida pero OMITIDA en entorno local/dev/testing para depuración');
+            } else {
+                Log::info('SIGDEBUG: firma inválida en producción, abortando');
+                return response('invalid signature', 400);
+            }
         }
 
+        // 2) Sólo eventos de transacción
         if (data_get($payload, 'event') !== 'transaction.updated') {
+            Log::info('SIGDEBUG: evento ignorado', ['event' => data_get($payload, 'event')]);
             return response('ignored', 200);
         }
 
+        // 3) Campos de la tx
         $tx = (array) data_get($payload, 'data.transaction', []);
         $txId = (string) data_get($tx, 'id', '');
-        $txStatus = strtoupper((string) data_get($tx, 'status', ''));  // puede venir vacío en sandbox
+        $txStatus = strtoupper((string) data_get($tx, 'status', ''));
         $txAmount = (int) data_get($tx, 'amount_in_cents', 0);
-        $txRef = (string) data_get($tx, 'reference', '');           // trae el link_id al inicio
+        $txRef = (string) data_get($tx, 'reference', '');
         $pmType = (string) data_get($tx, 'payment_method_type', '');
         $approved = $this->wompiIsApproved($tx);
 
-        // Ubicar factura de forma robusta (por link_id del reference o payment_link_id)
+        Log::info('Webhook TX parsed', [
+            'tx_id' => $txId,
+            'status' => $txStatus,
+            'approved' => $approved,
+            'reference' => $txRef,
+            'plink_from_ref' => $this->linkIdFromReference($txRef),
+            'payment_link_id' => data_get($tx, 'payment_link_id'),
+        ]);
+
+        // 4) Buscar factura
         $invoice = $this->findInvoiceFromTx($tx);
         if (!$invoice) {
-            Log::error('Wompi webhook: invoice not found', [
-                'tx_id' => $txId,
-                'reference' => $txRef,
+            Log::info('Webhook: invoice not found (no update)', [
                 'payment_link_id' => data_get($tx, 'payment_link_id'),
+                'reference' => $txRef,
             ]);
-            return response('ok', 200); // responder 200 para que Wompi no reintente infinito
+            return response('ok', 200);
         }
 
-        // Idempotencia: si ya procesaste esta tx con mismo estado, salir
+        // 5) Idempotencia
         if ($invoice->wompi_transaction_id === $txId && strtoupper((string) $invoice->wompi_status) === $txStatus) {
+            Log::info('Webhook: idempotent hit, nothing to do', ['invoice_id' => $invoice->id]);
             return response('ok', 200);
         }
         if ($approved && $invoice->status === 'pagada') {
+            Log::info('Webhook: already paid, nothing to do', ['invoice_id' => $invoice->id]);
             return response('ok', 200);
         }
 
-        // Mapeo a tu ENUM
+        // 6) Mapeo a tu enum
         $newStatus = $approved ? 'pagada' : match ($txStatus) {
             'DECLINED', 'VOIDED', 'ERROR' => 'cancelada',
             'PENDING', '' => 'pendiente',
             default => 'pendiente',
         };
 
-        // (Opcional) Validación suave de montos en centavos
-        // if ($txAmount > 0 && (int)$invoice->valfactura !== $txAmount) { ... log / nota }
-
-        // Guardar todo
+        // 7) Guardar
         $invoice->wompi_transaction_id = $txId ?: $invoice->wompi_transaction_id;
         $invoice->wompi_status = $txStatus ?: $invoice->wompi_status;
         $invoice->wompi_amount_in_cents = $txAmount ?: $invoice->wompi_amount_in_cents;
@@ -214,7 +228,6 @@ class InvoicePaymentController extends Controller
             $invoice->paid_at = now();
         }
 
-        // (Opcional) guarda el link_id real que trajo el webhook si aún no está
         if (empty($invoice->wompi_link_id) && ($linkId = $this->linkIdFromReference($txRef))) {
             $invoice->wompi_link_id = $linkId;
         }
@@ -236,44 +249,49 @@ class InvoicePaymentController extends Controller
 
 
 
+
     /**
      * Verifica la firma del evento Wompi (X-Event-Checksum / signature.checksum)
      * Doc: concatenar en orden los valores de signature.properties + timestamp + secret y hacer SHA256. :contentReference[oaicite:2]{index=2}
      */
     private function verifyWompiSignature(Request $request, array $payload): bool
     {
-        $secret = config('services.wompi.events_secret');
-        if (!$secret) {
-            Log::error('Wompi: events_secret missing');
-            return false;
-        }
-
+        $secret = (string) config('services.wompi.events_secret', '');
+        $hdr = (string) $request->header('X-Event-Checksum', '');
+        $bodySig = (string) data_get($payload, 'signature.checksum', '');
         $props = data_get($payload, 'signature.properties', []);
-        // timestamp entero (preferido por Wompi)
         $timestamp = data_get($payload, 'timestamp');
 
-        // fallback: si no vino timestamp, intenta convertir sent_at a epoch
-        if ($timestamp === null) {
-            if ($sentAt = data_get($payload, 'sent_at')) {
-                try {
-                    $timestamp = (string) \Carbon\Carbon::parse($sentAt)->timestamp;
-                } catch (\Throwable $e) {
-                    $timestamp = null;
-                }
+        // Fallback de timestamp
+        if ($timestamp === null && ($sentAt = data_get($payload, 'sent_at'))) {
+            try {
+                $timestamp = (string) \Carbon\Carbon::parse($sentAt)->timestamp;
+            } catch (\Throwable $e) {
+                $timestamp = null;
             }
         }
 
-        if (!is_array($props) || $timestamp === null || $timestamp === '') {
-            Log::warning('Wompi webhook: missing properties/timestamp');
-            return false;
+        Log::info('SIGDEBUG: inputs', [
+            'has_secret' => !empty($secret),
+            'hdr' => $hdr ? 'present' : 'missing',
+            'bodySig' => $bodySig ? 'present' : 'missing',
+            'props_count' => is_array($props) ? count($props) : 0,
+            'timestamp_present' => $timestamp !== null && $timestamp !== '',
+        ]);
+
+        if (empty($secret) || !is_array($props) || $timestamp === null || $timestamp === '') {
+            Log::info('SIGDEBUG: missing secret/props/timestamp');
+            // En local/dev/testing permitimos continuar para depurar
+            return app()->environment(['local', 'development', 'testing']) ? false : false;
+            // Nota: devolvemos false; el caller decide si bypass en local.
         }
 
-        // concatena en orden los campos pedidos dentro de data
+        // Concatenar valores de data.<prop> + timestamp + secret
         $concat = '';
         foreach ($props as $path) {
             $val = data_get($payload, 'data.' . $path);
             if ($val === null) {
-                Log::warning('Wompi webhook: property not found', ['path' => $path]);
+                Log::info('SIGDEBUG: property not found', ['path' => $path]);
                 return false;
             }
             $concat .= (string) $val;
@@ -281,23 +299,25 @@ class InvoicePaymentController extends Controller
         $concat .= (string) $timestamp . $secret;
 
         $computed = strtoupper(hash('sha256', $concat));
-        $fromHdr = strtoupper((string) $request->header('X-Event-Checksum', ''));
-        $fromBody = strtoupper((string) data_get($payload, 'signature.checksum', ''));
+        $hdrUp = strtoupper($hdr);
+        $bodyUp = strtoupper($bodySig);
 
-        if ($computed !== $fromHdr && $computed !== $fromBody) {
-            Log::warning('Wompi webhook: checksum mismatch', [
-                'computed' => $computed,
-                'hdr' => $fromHdr,
-                'body' => $fromBody,
-            ]);
-            return false;
-        }
-        return true;
+        $match = ($computed === $hdrUp) || ($computed === $bodyUp);
+
+        Log::info('SIGDEBUG: compare', [
+            'computed' => $computed,
+            'header' => $hdrUp ?: 'NONE',
+            'body' => $bodyUp ?: 'NONE',
+            'match' => $match,
+        ]);
+
+        return $match;
     }
-    // ✅ NUEVO helper: evalúa si la transacción quedó aprobada (sandbox o prod)
+
+    // ✅ NUEVO helper: evalúa si la transacción quedó aprobada (sandbox o prod)// ✅ Helper: ¿la transacción quedó aprobada? (sandbox o prod)
     private function wompiIsApproved(array $tx): bool
     {
-        $status = strtoupper((string) data_get($tx, 'status', '')); // puede no venir en sandbox
+        $status = strtoupper((string) data_get($tx, 'status', ''));
         $sandboxStatus = strtoupper((string) data_get($tx, 'payment_method.sandbox_status', ''));
         $finalizedAt = data_get($tx, 'finalized_at');
 
@@ -305,51 +325,40 @@ class InvoicePaymentController extends Controller
             || ($sandboxStatus === 'APPROVED' && !empty($finalizedAt));
     }
 
-    // ✅ NUEVO helper: saca el link_id del transaction.reference de Wompi
+    // ✅ Helper: extrae link_id al inicio del reference "test_xxx_..."
     private function linkIdFromReference(?string $ref): ?string
     {
         if (!$ref)
             return null;
-        // Ej: reference = "test_vRM66j_1759274050_XxBtsNuyk" => "test_vRM66j"
         return \Illuminate\Support\Str::before($ref, '_') ?: null;
     }
 
-    // ✅ (Opcional) NUEVO helper: intenta encontrar la factura a partir del tx
+    // ✅ Helper: encuentra la factura desde el payload de Wompi
     private function findInvoiceFromTx(array $tx): ?\App\Models\Invoice
     {
-        $plinkId = data_get($tx, 'payment_link_id'); // a veces viene
+        $plinkId = data_get($tx, 'payment_link_id');
         $txRef = (string) data_get($tx, 'reference', '');
 
-        // 1) Por payment_link_id directo
+        // 1) Por payment_link_id (si viene)
         if ($plinkId) {
             if ($inv = \App\Models\Invoice::where('wompi_link_id', $plinkId)->first()) {
                 return $inv;
             }
         }
 
-        // 2) Por link_id dentro del reference del webhook
+        // 2) Por link_id dentro del reference (test_XXXX)
         if ($linkId = $this->linkIdFromReference($txRef)) {
             if ($inv = \App\Models\Invoice::where('wompi_link_id', $linkId)->first()) {
                 return $inv;
             }
         }
 
-        // 3) Fallback raros: por wompi_reference (poco usual) o por REFPAGO en description
+        // 3) Fallbacks
         if ($txRef) {
             if ($inv = \App\Models\Invoice::where('wompi_reference', $txRef)->first()) {
                 return $inv;
             }
         }
-
-        $desc = (string) data_get($tx, 'payment_method.extra.payment_description', '');
-        if (preg_match('/factura\s+(\w+)/i', $desc, $m)) {
-            $refpago = $m[1];
-            if ($inv = \App\Models\Invoice::where('refpago', $refpago)->first()) {
-                return $inv;
-            }
-        }
-
-        // 4) Último intento: si tu reference de creación fue "INV-<refpago>-XXXX"
         if ($refpago = $this->extractRefpagoFromReference($txRef)) {
             if ($inv = \App\Models\Invoice::where('refpago', $refpago)->first()) {
                 return $inv;
@@ -358,6 +367,7 @@ class InvoicePaymentController extends Controller
 
         return null;
     }
+
 
 
     /** Extrae REFPAGO de referencias tipo "INV-<refpago>-XYZ" */
