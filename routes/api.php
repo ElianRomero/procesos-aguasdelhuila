@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PublicApiController;
+use App\Http\Controllers\WompiWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -12,7 +13,9 @@ use App\Http\Controllers\PublicApiController;
 */
 
 Route::get('/procesos', [PublicApiController::class, 'procesos'])
+
     ->name('api.public.procesos');
+Route::post('/wompi/webhook', [WompiWebhookController::class, 'receive']);
 
 
 // (Opcional) Ping para pruebas rápidas de disponibilidad de API

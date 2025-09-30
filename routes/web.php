@@ -292,14 +292,12 @@ Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.pr
 
 
 // Público / cliente:
+// web.php o api.php
 Route::get('/pago/buscar', [InvoicePaymentController::class, 'searchForm'])->name('pago.search.form');
-Route::get('/pago', [InvoicePaymentController::class, 'search'])->name('pago.search'); // ?refpago=123
+Route::get('/pago', [InvoicePaymentController::class, 'search'])->name('pago.search');
 Route::get('/pago/{refpago}', [InvoicePaymentController::class, 'show'])->name('pago.show');
-Route::post('/pago/{refpago}/link', [InvoicePaymentController::class, 'createOrReuseLink'])->name('pago.link');
+Route::post('/wompi/webhook', [InvoicePaymentController::class, 'webhook'])->name('wompi.webhook');
 
-// Webhook Wompi:
-Route::post('/webhook/wompi', [InvoicePaymentController::class, 'webhook'])
-  ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
 
 require __DIR__ . '/auth.php';
