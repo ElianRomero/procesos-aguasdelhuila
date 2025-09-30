@@ -91,8 +91,9 @@ class InvoicePaymentController extends Controller
     public function createOrReuseLink(Request $request, string $refpago)
     {
         $invoice = Invoice::where('refpago', $refpago)->firstOrFail();
-
-        // No cobres montos <= 0
+        if ($invoice->status === 'pagada') {
+            return back()->with('ok', 'Esta factura ya fue pagada. ¡Gracias!');
+        }
         if ($invoice->valfactura <= 0) {
             return back()->with('error', 'Esta factura tiene saldo cero/negativo. No es cobrable.');
         }
@@ -101,114 +102,73 @@ class InvoicePaymentController extends Controller
         $privateKey = config('services.wompi.private_key');
         $currency = 'COP';
 
-        // Reusar link activo (verificación remota)
-        if ($invoice->payment_link_url && $invoice->expires_at && now()->lt($invoice->expires_at)) {
-            if (preg_match('#/l/([A-Za-z0-9\-_]+)#', $invoice->payment_link_url, $m)) {
-                $id = $m[1];
-                $health = Http::retry(1, 200)->timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
-                if ($health->successful()) {
-                    $info = $health->json();
-                    $active = (bool) data_get($info, 'data.active');
-                    $mpk = data_get($info, 'data.merchant_public_key');
-                    if ($active && $mpk) {
-                        return redirect()->away('https://checkout.wompi.co/l/' . $id);
-                    }
-                }
-            }
-            // si no está activo, se genera uno nuevo
+        // Dedupe: si hace < 15s ya generaste uno, reenvía a ese y evita lluvia de links
+        if ($invoice->wompi_link_id && $invoice->updated_at && now()->diffInSeconds($invoice->updated_at) < 15) {
+            return redirect()->away('https://checkout.wompi.co/l/' . $invoice->wompi_link_id);
         }
 
         $name = $this->cleanStr("Pago factura " . $invoice->refpago, 64);
         $description = $this->cleanStr("Factura de {$invoice->nombre} - {$invoice->direccion}", 180);
         $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
 
-        $http = Http::withToken($privateKey)
-            ->acceptJson()->asJson()
-            ->retry(2, 300)->timeout(15);
+        $reference = 'INV-' . $invoice->refpago . '-' . Str::upper(Str::random(6));
 
-        for ($attempt = 1; $attempt <= 2; $attempt++) {
-            $reference = 'INV-' . $invoice->refpago . '-' . Str::upper(Str::random(6));
+        $payload = [
+            'name' => $name,
+            'description' => $description,
+            'single_use' => true,
+            'collect_shipping' => false,
+            'currency' => $currency,
+            'amount_in_cents' => (int) $invoice->valfactura,
+            'reference' => $reference,
+            'expires_at' => $expiresAtUtc,
+            'redirect_url' => route('pago.show', ['refpago' => $invoice->refpago]),
+        ];
 
-            $payload = [
-                'name' => $name,
-                'description' => $description,
-                'single_use' => true,
-                'collect_shipping' => false,                 // requerido
-                'currency' => $currency,             // monto fijo
-                'amount_in_cents' => (int) $invoice->valfactura,
-                'reference' => $reference,
-                'expires_at' => $expiresAtUtc,         // ISO-8601 (UTC)
-                'redirect_url' => route('pago.show', ['refpago' => $invoice->refpago]),
-            ];
-
-            try {
-                $resp = $http->post($wompiBase . '/v1/payment_links', $payload);
-
-                if ($resp->successful()) {
-                    $data = $resp->json();
-
-                    // Siempre toma el id del link
-                    $id = data_get($data, 'data.id');
-                    if (!$id) {
-                        Log::error('Wompi: respuesta sin id', ['data' => $data]);
-                        return back()->with('error', 'No fue posible generar el enlace de pago (sin id).');
-                    }
-
-                    // Verifica que el link esté activo y tenga merchant_public_key
-                    $health = Http::retry(1, 200)->timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
-                    if (!$health->successful()) {
-                        Log::error('Wompi: GET payment_links/:id falló', ['id' => $id, 'status' => $health->status(), 'body' => $health->json()]);
-                        return back()->with('error', 'No fue posible validar el enlace de pago.');
-                    }
-                    $info = $health->json();
-                    $mpk = data_get($info, 'data.merchant_public_key');
-                    $active = (bool) data_get($info, 'data.active');
-                    if (!$mpk || !$active) {
-                        Log::error('Wompi: link sin merchant_public_key o inactivo', ['info' => $info]);
-                        return back()->with('error', 'El enlace de pago no quedó activado. Intenta de nuevo.');
-                    }
-
-                    $paymentLinkUrl = 'https://checkout.wompi.co/l/' . $id;
-
-                    // Guarda (expiración en tu zona)
-                    $invoice->update([
-                        'payment_link_url' => $paymentLinkUrl,
-                        'wompi_link_id' => $id, // 👈 guardamos el id del payment link
-                        'expires_at' => \Illuminate\Support\Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
-                        'wompi_reference' => $reference,
-                        'status' => 'pendiente',
-                    ]);
-
-                    return redirect()->away($paymentLinkUrl);
-                }
-
-                // 409/422: validación o conflicto de reference
+        try {
+            $resp = Http::withToken($privateKey)->acceptJson()->asJson()->timeout(15)->post($wompiBase . '/v1/payment_links', $payload);
+            if (!$resp->successful()) {
+                // 409/422: conflicto de reference u otros
                 if (in_array($resp->status(), [409, 422])) {
                     $body = $resp->json();
-                    $messages = data_get($body, 'error.messages', []);
-                    $flatMsg = is_array($messages) ? implode(' | ', collect($messages)->flatten()->all()) : ($messages ?: '');
-                    if (stripos($flatMsg, 'reference') !== false) {
-                        Log::warning('Wompi: reference conflict, retrying', ['messages' => $messages]);
-                        continue; // reintenta con otra referencia
-                    }
-                    $firstField = is_array($messages) ? array_key_first($messages) : null;
-                    $firstErr = $firstField && isset($messages[$firstField][0]) ? $messages[$firstField][0] : null;
-                    return back()->with('error', $firstErr ?: ($flatMsg ?: 'Error de validación con Wompi.'));
+                    $msgs = data_get($body, 'error.messages', []);
+                    $flat = is_array($msgs) ? implode(' | ', collect($msgs)->flatten()->all()) : ($msgs ?: '');
+                    return back()->with('error', $flat ?: 'Error de validación con Wompi.');
                 }
-
                 Log::error('Wompi payment_link error', ['status' => $resp->status(), 'body' => $resp->json()]);
-                return back()->with('error', 'No fue posible generar el enlace de pago en este momento. Intenta de nuevo.');
-
-            } catch (\Throwable $e) {
-                Log::error('Excepción Wompi', ['e' => $e->getMessage(), 'attempt' => $attempt]);
-                if ($attempt >= 2) {
-                    return back()->with('error', 'Error interno al generar el enlace de pago.');
-                }
+                return back()->with('error', 'No fue posible generar el enlace de pago.');
             }
-        }
 
-        return back()->with('error', 'No fue posible generar el enlace de pago. Intenta más tarde.');
+            $data = $resp->json();
+            $id = data_get($data, 'data.id');                    // <-- ID del link
+            if (!$id) {
+                Log::error('Wompi: respuesta sin id', ['data' => $data]);
+                return back()->with('error', 'No fue posible generar el enlace de pago.');
+            }
+
+            // (Opcional) health check: GET /v1/payment_links/:id devuelve active + merchant_public_key
+            $health = Http::timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
+            if (!$health->successful() || !data_get($health->json(), 'data.active')) {
+                Log::error('Wompi: link recién creado inactivo', ['id' => $id, 'body' => $health->json()]);
+                return back()->with('error', 'El enlace no quedó activo. Intenta de nuevo.');
+            }
+
+            $invoice->update([
+                'payment_link_url' => 'https://checkout.wompi.co/l/' . $id,
+                'wompi_link_id' => $id,
+                'expires_at' => \Illuminate\Support\Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
+                'wompi_reference' => $reference,
+                'status' => 'pendiente',
+            ]);
+
+            return redirect()->away('https://checkout.wompi.co/l/' . $id);
+
+        } catch (\Throwable $e) {
+            Log::error('Excepción Wompi', ['e' => $e->getMessage()]);
+            return back()->with('error', 'Error interno al generar el enlace de pago.');
+        }
     }
+
 
 
 
@@ -228,47 +188,46 @@ class InvoicePaymentController extends Controller
             'env' => data_get($payload, 'environment'),
         ]);
 
-        // Firma
+        // 1) Firma (obligatoria)
         if (!$this->verifyWompiSignature($request, $payload)) {
             Log::warning('Wompi webhook: invalid signature');
             return response('invalid signature', 400);
         }
 
+        // 2) Solo transacciones
         if (data_get($payload, 'event') !== 'transaction.updated') {
             return response('ignored', 200);
         }
 
         $tx = data_get($payload, 'data.transaction', []);
-        $txId = data_get($tx, 'id');
         $txRef = data_get($tx, 'reference');
         $txStatus = data_get($tx, 'status');              // APPROVED|DECLINED|VOIDED|ERROR|PENDING
-        $amount = (int) data_get($tx, 'amount_in_cents');
         $plinkId = data_get($tx, 'payment_link_id') ?: data_get($payload, 'data.payment_link.id');
 
-        // Buscar la invoice por todas las pistas
-        $query = Invoice::query();
-        if (!empty($txRef)) {
-            $query->orWhere('wompi_reference', $txRef);
+        // 3) Encontrar invoice por todas las pistas
+        $q = \App\Models\Invoice::query();
+        if ($txRef) {
+            $q->orWhere('wompi_reference', $txRef);
             if ($refpago = $this->extractRefpagoFromReference($txRef)) {
-                $query->orWhere('refpago', $refpago);
+                $q->orWhere('refpago', $refpago);
             }
         }
-        if (!empty($plinkId)) {
-            $query->orWhere('wompi_link_id', $plinkId);
+        if ($plinkId) {
+            $q->orWhere('wompi_link_id', $plinkId);
         }
-        $invoice = $query->first();
+        $invoice = $q->first();
 
         if (!$invoice) {
             Log::error('Wompi webhook: invoice not found', ['ref' => $txRef, 'plinkId' => $plinkId]);
             return response('ok', 200);
         }
 
-        // Idempotencia simple
+        // 4) Idempotencia
         if ($invoice->status === 'pagada' && $txStatus === 'APPROVED') {
             return response('ok', 200);
         }
 
-        // Mapeo a TU ENUM actual (pendiente|pagada|expirada|cancelada)
+        // 5) Mapeo compatible con tu ENUM actual
         $newStatus = match ($txStatus) {
             'APPROVED' => 'pagada',
             'PENDING' => 'pendiente',
@@ -276,16 +235,12 @@ class InvoicePaymentController extends Controller
             default => 'pendiente',
         };
 
-        // Si tienes paid_at en tu tabla, descomenta:
-        // if ($newStatus === 'pagada') {
-        //     $invoice->paid_at = now();
-        // }
-
-        $invoice->status = $newStatus;
+        $invoice->status = $newStatus;         // si tienes paid_at, puedes setearlo aquí
         $invoice->save();
 
         return response('ok', 200);
     }
+
 
 
     /**
