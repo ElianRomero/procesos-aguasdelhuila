@@ -151,71 +151,92 @@ class InvoicePaymentController extends Controller
     // Webhook (notificación Wompi)
     public function webhook(Request $request)
     {
+        // 0) Log crudo para depurar
         Log::info('Webhook ARRIVED', ['raw' => $request->getContent()]);
 
-        $raw = $request->getContent();
-        $payload = json_decode($raw, true) ?? [];
+        $payload = json_decode($request->getContent(), true) ?? [];
 
-        Log::info('Wompi webhook hit', [
-            'event' => data_get($payload, 'event'),
-            'id' => data_get($payload, 'data.transaction.id'),
-            'ref' => data_get($payload, 'data.transaction.reference'),
-            'status' => data_get($payload, 'data.transaction.status'),
-            'env' => data_get($payload, 'environment'),
-        ]);
-
-        // 1) Firma (obligatoria)
+        // 1) Firma obligatoria (los pings manuales fallarán aquí, es normal)
         if (!$this->verifyWompiSignature($request, $payload)) {
             Log::warning('Wompi webhook: invalid signature');
             return response('invalid signature', 400);
         }
 
-        // 2) Solo transacciones
+        // 2) Sólo transacciones
         if (data_get($payload, 'event') !== 'transaction.updated') {
             return response('ignored', 200);
         }
 
+        // 3) Campos que usaremos
         $tx = data_get($payload, 'data.transaction', []);
-        $txRef = data_get($tx, 'reference');
-        $txStatus = data_get($tx, 'status');              // APPROVED|DECLINED|VOIDED|ERROR|PENDING
+        $txId = data_get($tx, 'id');
+        $txStatus = data_get($tx, 'status');                // APPROVED|DECLINED|VOIDED|ERROR|PENDING
+        $txAmount = (int) data_get($tx, 'amount_in_cents');
+        $txRef = data_get($tx, 'reference');             // test_<plink>_...
         $plinkId = data_get($tx, 'payment_link_id') ?: data_get($payload, 'data.payment_link.id');
 
-        // 3) Encontrar invoice por todas las pistas
-        $q = \App\Models\Invoice::query();
-        if ($txRef) {
-            $q->orWhere('wompi_reference', $txRef);
-            if ($refpago = $this->extractRefpagoFromReference($txRef)) {
-                $q->orWhere('refpago', $refpago);
+        Log::info('Wompi webhook hit', [
+            'plinkId' => $plinkId,
+            'tx_id' => $txId,
+            'ref' => $txRef,
+            'status' => $txStatus,
+        ]);
+
+        // 4) Buscar la factura: PRIORIDAD por payment_link_id
+        $invoice = null;
+
+        if ($plinkId) {
+            $invoice = Invoice::where('wompi_link_id', $plinkId)->first();
+        }
+
+        // Fallbacks: por referencia autogenerada (poco útil) o por REFPAGO extraído
+        if (!$invoice && $txRef) {
+            // si por alguna razón guardaste esa referencia en algún momento
+            $invoice = Invoice::where('wompi_reference', $txRef)->first();
+
+            if (!$invoice) {
+                if ($refpago = $this->extractRefpagoFromReference($txRef)) {
+                    $invoice = Invoice::where('refpago', $refpago)->first();
+                }
             }
         }
-        if ($plinkId) {
-            $q->orWhere('wompi_link_id', $plinkId);
-        }
-        $invoice = $q->first();
 
         if (!$invoice) {
-            Log::error('Wompi webhook: invoice not found', ['ref' => $txRef, 'plinkId' => $plinkId]);
+            Log::error('Wompi webhook: invoice not found', ['plinkId' => $plinkId, 'ref' => $txRef]);
             return response('ok', 200);
         }
 
-        // 4) Idempotencia
+        // 5) Idempotencia
         if ($invoice->status === 'pagada' && $txStatus === 'APPROVED') {
             return response('ok', 200);
         }
 
-        // 5) Mapeo compatible con tu ENUM actual
+        // 6) Mapeo → tu ENUM: pendiente | pagada | expirada | cancelada
         $newStatus = match ($txStatus) {
             'APPROVED' => 'pagada',
-            'PENDING' => 'pendiente',
             'DECLINED', 'VOIDED', 'ERROR' => 'cancelada',
+            'PENDING' => 'pendiente',
             default => 'pendiente',
         };
 
-        $invoice->status = $newStatus;         // si tienes paid_at, puedes setearlo aquí
+        // 7) Guardar info útil de la transacción (si tienes estas columnas)
+        $invoice->wompi_transaction_id = $txId;
+        $invoice->wompi_status = $txStatus;
+        $invoice->wompi_amount_in_cents = $txAmount;
+        $invoice->status = $newStatus;
+        if ($newStatus === 'pagada' && empty($invoice->paid_at)) {
+            $invoice->paid_at = now();
+        }
         $invoice->save();
+
+        Log::info('Invoice updated from webhook', [
+            'id' => $invoice->id,
+            'status' => $invoice->status,
+        ]);
 
         return response('ok', 200);
     }
+
 
 
 
