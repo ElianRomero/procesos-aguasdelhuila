@@ -273,10 +273,8 @@ class InvoicePaymentController extends Controller
         // 7) Aplica el mapeo de estado
         $newStatus = match ($txStatus) {
             'APPROVED' => 'pagada',
-            'DECLINED' => 'rechazada',
-            'VOIDED' => 'anulada',
-            'ERROR' => 'error',
-            default => 'pendiente', // PENDING u otros
+            'DECLINED', 'VOIDED', 'ERROR' => 'cancelada',
+            default => 'pendiente',
         };
 
         // 8) Guarda campos útiles de la transacción
@@ -310,30 +308,52 @@ class InvoicePaymentController extends Controller
         }
 
         $props = data_get($payload, 'signature.properties', []);
-        $timestamp = (string) data_get($payload, 'timestamp'); // UNIX
-        if (!is_array($props) || $timestamp === '') {
+        // timestamp entero (preferido por Wompi)
+        $timestamp = data_get($payload, 'timestamp');
+
+        // fallback: si no vino timestamp, intenta convertir sent_at a epoch
+        if ($timestamp === null) {
+            if ($sentAt = data_get($payload, 'sent_at')) {
+                try {
+                    $timestamp = (string) \Carbon\Carbon::parse($sentAt)->timestamp;
+                } catch (\Throwable $e) {
+                    $timestamp = null;
+                }
+            }
+        }
+
+        if (!is_array($props) || $timestamp === null || $timestamp === '') {
+            Log::warning('Wompi webhook: missing properties/timestamp');
             return false;
         }
 
-        // Extrae los valores en el orden indicado por properties (siempre del objeto "data")
+        // concatena en orden los campos pedidos dentro de data
         $concat = '';
         foreach ($props as $path) {
-            // properties vienen como "transaction.id", "transaction.status", etc. dentro de data
-            $value = data_get($payload, 'data.' . $path);
-            if ($value === null) {
+            $val = data_get($payload, 'data.' . $path);
+            if ($val === null) {
+                Log::warning('Wompi webhook: property not found', ['path' => $path]);
                 return false;
             }
-            $concat .= (string) $value;
+            $concat .= (string) $val;
         }
-        $concat .= $timestamp . $secret;
+        $concat .= (string) $timestamp . $secret;
 
         $computed = strtoupper(hash('sha256', $concat));
         $fromHdr = strtoupper((string) $request->header('X-Event-Checksum', ''));
         $fromBody = strtoupper((string) data_get($payload, 'signature.checksum', ''));
 
-        // Acepta si coincide con header o con signature.checksum del body
-        return $computed && ($computed === $fromHdr || $computed === $fromBody);
+        if ($computed !== $fromHdr && $computed !== $fromBody) {
+            Log::warning('Wompi webhook: checksum mismatch', [
+                'computed' => $computed,
+                'hdr' => $fromHdr,
+                'body' => $fromBody,
+            ]);
+            return false;
+        }
+        return true;
     }
+
 
     /** Extrae REFPAGO de referencias tipo "INV-<refpago>-XYZ" */
     private function extractRefpagoFromReference(string $ref): ?string
