@@ -155,7 +155,7 @@ class InvoicePaymentController extends Controller
 
         $payload = json_decode($request->getContent(), true) ?? [];
 
-        // 1) Verificación de firma (con bypass en local/dev/testing y logs en INFO)
+        // 1) Verificación de firma
         $sigOk = $this->verifyWompiSignature($request, $payload);
         if (!$sigOk) {
             if (app()->environment(['local', 'development', 'testing'])) {
@@ -172,13 +172,13 @@ class InvoicePaymentController extends Controller
             return response('ignored', 200);
         }
 
-        // 3) Campos de la tx
+        // 3) Campos de la transacción
         $tx = (array) data_get($payload, 'data.transaction', []);
         $txId = (string) data_get($tx, 'id', '');
         $txStatus = strtoupper((string) data_get($tx, 'status', ''));
         $txAmount = (int) data_get($tx, 'amount_in_cents', 0);
         $txRef = (string) data_get($tx, 'reference', '');
-        $pmType = (string) data_get($tx, 'payment_method_type', '');
+        $plinkId = (string) data_get($tx, 'payment_link_id', '');
         $approved = $this->wompiIsApproved($tx);
 
         Log::info('Webhook TX parsed', [
@@ -186,15 +186,15 @@ class InvoicePaymentController extends Controller
             'status' => $txStatus,
             'approved' => $approved,
             'reference' => $txRef,
-            'plink_from_ref' => $this->linkIdFromReference($txRef),
-            'payment_link_id' => data_get($tx, 'payment_link_id'),
+            'plink_from_ref' => $this->linkIdFromReference($txRef), // ya tienes el helper corregido
+            'payment_link_id' => $plinkId,
         ]);
 
         // 4) Buscar factura
         $invoice = $this->findInvoiceFromTx($tx);
         if (!$invoice) {
             Log::info('Webhook: invoice not found (no update)', [
-                'payment_link_id' => data_get($tx, 'payment_link_id'),
+                'payment_link_id' => $plinkId,
                 'reference' => $txRef,
             ]);
             return response('ok', 200);
@@ -210,26 +210,26 @@ class InvoicePaymentController extends Controller
             return response('ok', 200);
         }
 
-        // 6) Mapeo a tu enum
+        // 6) Mapeo a tu enum de estado
         $newStatus = $approved ? 'pagada' : match ($txStatus) {
             'DECLINED', 'VOIDED', 'ERROR' => 'cancelada',
             'PENDING', '' => 'pendiente',
             default => 'pendiente',
         };
 
-        // 7) Guardar
+        // 7) Guardar (sin wompi_payment_method)
         $invoice->wompi_transaction_id = $txId ?: $invoice->wompi_transaction_id;
         $invoice->wompi_status = $txStatus ?: $invoice->wompi_status;
         $invoice->wompi_amount_in_cents = $txAmount ?: $invoice->wompi_amount_in_cents;
-        $invoice->wompi_payment_method = $pmType ?: $invoice->wompi_payment_method;
         $invoice->status = $newStatus;
 
         if ($newStatus === 'pagada' && empty($invoice->paid_at)) {
             $invoice->paid_at = now();
         }
 
-        if (empty($invoice->wompi_link_id) && ($linkId = $this->linkIdFromReference($txRef))) {
-            $invoice->wompi_link_id = $linkId;
+        if (empty($invoice->wompi_link_id)) {
+            $fromRef = $this->linkIdFromReference($txRef);
+            $invoice->wompi_link_id = $plinkId ?: $fromRef ?: $invoice->wompi_link_id;
         }
 
         $invoice->save();
@@ -244,6 +244,7 @@ class InvoicePaymentController extends Controller
 
         return response('ok', 200);
     }
+
 
 
 
@@ -330,8 +331,10 @@ class InvoicePaymentController extends Controller
     {
         if (!$ref)
             return null;
-        return \Illuminate\Support\Str::before($ref, '_') ?: null;
+        $parts = explode('_', $ref, 3);
+        return count($parts) >= 2 ? ($parts[0] . '_' . $parts[1]) : null; // ej: test_HjwLXH
     }
+
 
     // ✅ Helper: encuentra la factura desde el payload de Wompi
     private function findInvoiceFromTx(array $tx): ?\App\Models\Invoice
