@@ -15,5 +15,6 @@ class AuthServiceProvider extends ServiceProvider
     {
         Gate::define('isAdmin', fn(User $user) => (int) $user->role_id === 1);
         Gate::define('isProponente', fn(User $user) => (int) $user->role_id === 3);
+        Gate::define('isContratacion', callback: fn(User $user) => (int) $user->role_id === 2);
     }
 }
