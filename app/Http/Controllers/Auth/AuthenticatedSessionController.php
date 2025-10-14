@@ -22,18 +22,24 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-   public function store(LoginRequest $request): RedirectResponse
-{
-    $request->authenticate();
+    public function store(LoginRequest $request): RedirectResponse
+    {
+        $request->authenticate();
 
-    $request->session()->regenerate();
+        $request->session()->regenerate();
 
-    if (Auth::user()->role_id == 3) {
-        return redirect()->route('proponente.create');
+        $user = Auth::user();
+
+        if ($user->role_id == 3) {
+            return redirect()->route('proponente.create');
+        }
+
+        if ($user->role_id == 2) {
+            return redirect()->route('invoices.import.form');
+        }
+
+        return redirect()->intended(route('procesos.create', absolute: false));
     }
-
-    return redirect()->intended(route('procesos.create', absolute: false));
-}
 
 
     /**
