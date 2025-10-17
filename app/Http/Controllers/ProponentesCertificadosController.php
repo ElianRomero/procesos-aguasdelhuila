@@ -181,7 +181,7 @@ class ProponentesCertificadosController extends Controller
                     public_path('images/logo-aguas-del-huila.png'),
                 ];
                 foreach ($candidates as $logo) {
-                    if (is_file($logo)) { $this->Image($logo, 20, 6, 40); break; }
+                    if (is_file($logo)) { $this->Image($logo, 24, 6, 32); break; }
                 }
                 $this->SetFont('Arial','B',11);
                 $this->Cell(80);
