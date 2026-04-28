@@ -207,6 +207,8 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 Route::middleware(['auth', 'can:isContratacion'])->group(function () {
     Route::get('/admin/facturas/importar', [InvoiceImportController::class, 'form'])->name('invoices.import.form');
     Route::post('/admin/facturas/importar', [InvoiceImportController::class, 'import'])->name('invoices.import');
+        Route::get('/facturas', [InvoiceImportController::class, 'index'])->name('invoices.index');
+
 });
 
 

@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Validation\Rule;
+
 use App\Models\EstadoContrato;
 use App\Models\TipoContrato;
 use App\Models\TipoProceso;
+use App\Models\Ciiu; // ✅ NUEVO
 
 class ParametrosContratoController extends Controller
 {
@@ -15,6 +17,7 @@ class ParametrosContratoController extends Controller
         'estado'        => [EstadoContrato::class, 'estado_contratos', 'Estados de contrato'],
         'tipo_contrato' => [TipoContrato::class,  'tipo_contratos',   'Tipos de contrato'],
         'tipo_proceso'  => [TipoProceso::class,   'tipo_procesos',    'Tipos de proceso'],
+        'ciiu'          => [Ciiu::class,          'ciiu',             'CIIU'], // ✅ NUEVO
     ];
 
     public function index(Request $request)
@@ -22,8 +25,8 @@ class ParametrosContratoController extends Controller
         $estados        = EstadoContrato::orderBy('nombre')->get();
         $tiposContrato  = TipoContrato::orderBy('nombre')->get();
         $tiposProceso   = TipoProceso::orderBy('nombre')->get();
+        $ciius          = Ciiu::orderBy('nombre')->get(); // ✅ NUEVO
 
-        // pestaña activa por query (?tab=estado|tipo_contrato|tipo_proceso)
         $tab = $request->get('tab', 'estado');
         if (! array_key_exists($tab, $this->map)) {
             $tab = 'estado';
@@ -33,6 +36,7 @@ class ParametrosContratoController extends Controller
             'estados',
             'tiposContrato',
             'tiposProceso',
+            'ciius', // ✅ NUEVO
             'tab'
         ));
     }
@@ -42,10 +46,14 @@ class ParametrosContratoController extends Controller
         $entidad = $request->get('entidad');
         [$model, $table] = $this->resolve($entidad);
 
+        // ✅ Longitudes según la tabla (CIIU: codigo 10, nombre 1024)
+        $codigoMax = ($entidad === 'ciiu') ? 10 : 50;
+        $nombreMax = ($entidad === 'ciiu') ? 1024 : 255;
+
         $data = $request->validate([
             'entidad' => ['required', Rule::in(array_keys($this->map))],
-            'codigo'  => ['required', 'string', 'max:50', Rule::unique($table, 'codigo')],
-            'nombre'  => ['required', 'string', 'max:255'],
+            'codigo'  => ['required', 'string', "max:$codigoMax", Rule::unique($table, 'codigo')],
+            'nombre'  => ['required', 'string', "max:$nombreMax"],
         ]);
 
         $model::create([
@@ -62,12 +70,12 @@ class ParametrosContratoController extends Controller
         [$model, $table] = $this->resolve($entidad);
         $row = $model::findOrFail($id);
 
-        // ✅ Solo validamos nombre
+        $nombreMax = ($entidad === 'ciiu') ? 1024 : 255;
+
         $data = $request->validate([
-            'nombre' => ['required', 'string', 'max:255'],
+            'nombre' => ['required', 'string', "max:$nombreMax"],
         ]);
 
-        // ✅ Solo actualizamos nombre; el CÓDIGO no se toca
         $row->update([
             'nombre' => $data['nombre'],
         ]);
@@ -75,6 +83,7 @@ class ParametrosContratoController extends Controller
         return redirect()->route('parametros.index', ['tab' => $entidad])
             ->with('ok', 'Registro actualizado.');
     }
+
     public function destroy(Request $request, string $entidad, int $id)
     {
         [$model, $table] = $this->resolve($entidad);
@@ -84,7 +93,6 @@ class ParametrosContratoController extends Controller
             $row->delete();
             return back()->with('ok', 'Registro eliminado.')->with('tab', $entidad);
         } catch (QueryException $e) {
-            // Si hay FK en procesos, aquí atrapamos el error y avisamos
             return back()->with('error', 'No se puede eliminar: está en uso en otros registros.')
                 ->with('tab', $entidad);
         }
@@ -95,6 +103,6 @@ class ParametrosContratoController extends Controller
         if (! array_key_exists($entidad, $this->map)) {
             abort(404, 'Entidad no válida');
         }
-        return $this->map[$entidad]; // [ModelClass, table, label]
+        return $this->map[$entidad];
     }
 }

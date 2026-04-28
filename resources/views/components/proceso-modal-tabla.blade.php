@@ -1,7 +1,6 @@
 <div id="modal-tabla"
 x-init="window.openModalTabla = (payload) => open(payload)"
  x-data="{
-
     show: false,
     det: {
         codigo: '',
@@ -25,18 +24,10 @@ x-init="window.openModalTabla = (payload) => open(payload)"
         postular_url: '',
         archivos_url: ''
     },
-    secopUrl(u) {
-        if (!u) return '';
-        if (/^https?:\/\//i.test(u)) {
-            const m = u.match(/numConstancia=([^&]+)/i);
-            return m ? ('https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=' + encodeURIComponent(m[1])) : u;
-        }
-        return 'https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=' + encodeURIComponent(u);
-    },
     open(p) {
-      if (!p || !p.__click || !p.codigo) return;
+        if (!p || !p.__click || !p.codigo) return;
         this.det = Object.assign({}, this.det, p);
-        this.det.secop_url = this.secopUrl(this.det.link || '');
+        this.det.secop_url = this.det.link || '';
         this.show = true;
     }
 }" x-on:modal-proceso-tabla-open.document="open($event.detail)" x-cloak>
@@ -85,8 +76,8 @@ x-init="window.openModalTabla = (payload) => open(payload)"
                 acceder a través del siguiente botón.
             </div>
 
-            <div class="mt-4" x-show="det.secop_url">
-                <a :href="det.secop_url" target="_blank" rel="noopener noreferrer"
+             <div class="mt-4" x-show="det.link">
+                <a :href="det.link" target="_blank" rel="noopener noreferrer"
                     class="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
                     Ver en SECOP
                 </a>

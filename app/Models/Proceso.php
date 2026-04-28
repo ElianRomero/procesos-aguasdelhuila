@@ -17,7 +17,7 @@ class Proceso extends Model
         'objeto',
         'link_secop',
         'valor',
-        'fecha' => 'datetime:Y-m-d',
+        'fecha',
         'tipo_proceso_codigo',
         'estado_contrato_codigo',
         'tipo_contrato_codigo',
@@ -25,7 +25,7 @@ class Proceso extends Model
         'estado',
         'proponente_id',
         'requisitos',
-        'observaciones', // <- nota libre rápida (la conservamos)
+        'observaciones',
         'observaciones_abren_en',
         'observaciones_cierran_en',
     ];
@@ -67,7 +67,7 @@ class Proceso extends Model
             'codigo',
             'id'
         )->withPivot(['estado', 'observacion', 'postulado_en'])
-            ->withTimestamps();
+         ->withTimestamps();
     }
 
     public function archivosPostulacion()
@@ -75,7 +75,6 @@ class Proceso extends Model
         return $this->hasMany(PostulacionArchivo::class, 'proceso_codigo', 'codigo');
     }
 
-    // 🔹 Observaciones formales (con adjuntos)
     public function observacionesFormales()
     {
         return $this->hasMany(Observacion::class, 'proceso_codigo', 'codigo')->latest();
@@ -85,29 +84,28 @@ class Proceso extends Model
     {
         return 'codigo';
     }
+
     public function tieneVentanaObservaciones(): bool
     {
         return !is_null($this->observaciones_abren_en) && !is_null($this->observaciones_cierran_en);
     }
 
-    // ¿la ventana está abierta y además está definida?
     public function ventanaObservacionesAbiertaYDefinida(): bool
     {
-        if (!$this->tieneVentanaObservaciones())
+        if (!$this->tieneVentanaObservaciones()) {
             return false;
+        }
+
         return now()->between($this->observaciones_abren_en, $this->observaciones_cierran_en);
     }
 
-    // 👇 Compatibilidad con vistas antiguas
     public function ventanaObservacionesAbierta(): bool
     {
-        // Antes quizá devolvía true si no había ventana.
-        // Ahora lo hacemos consistente: solo true si está definida y abierta.
         return $this->ventanaObservacionesAbiertaYDefinida();
     }
+
     public function noticias()
     {
         return $this->hasMany(Noticia::class, 'proceso_codigo', 'codigo')->latest('publicada_en');
     }
-
 }

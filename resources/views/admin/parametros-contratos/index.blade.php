@@ -9,6 +9,7 @@
             {{ session('ok') }}
         </div>
     @endif
+
     @if (session('error'))
         <div class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-red-800">
             {{ session('error') }}
@@ -27,7 +28,7 @@
 
     <div x-data="{ tab: '{{ $tab }}', setTab(t){ this.tab=t; const url=new URL(window.location); url.searchParams.set('tab', t); history.replaceState({},'',url); } }">
         {{-- Pestañas --}}
-        <div class="flex gap-2 mb-4">
+        <div class="flex flex-wrap gap-2 mb-4">
             <button @click="setTab('estado')"
                 :class="tab==='estado' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'"
                 class="px-3 py-1.5 rounded border shadow">
@@ -45,6 +46,13 @@
                 class="px-3 py-1.5 rounded border shadow">
                 Tipos de proceso ({{ $tiposProceso->count() }})
             </button>
+
+            {{-- ✅ NUEVO TAB: CIIU --}}
+            <button @click="setTab('ciiu')"
+                :class="tab==='ciiu' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700'"
+                class="px-3 py-1.5 rounded border shadow">
+                CIIU ({{ $ciius->count() }})
+            </button>
         </div>
 
         {{-- Bloque Crear --}}
@@ -58,14 +66,25 @@
 
                 <div>
                     <label class="block text-sm text-gray-700">Código</label>
-                    <input name="codigo" required class="w-full border rounded px-3 py-2"
-                           placeholder="Ej: ACT, OBRA, SEL"
-                           oninput="this.value=this.value.toUpperCase()">
+
+                    {{-- ✅ Opcional: placeholder dinámico (solo visual) --}}
+                    <input
+                        name="codigo"
+                        required
+                        class="w-full border rounded px-3 py-2"
+                        :placeholder="tab==='ciiu' ? 'Ej: 0111, 6201, etc.' : 'Ej: ACT, OBRA, SEL'"
+                        oninput="this.value=this.value.toUpperCase()"
+                    >
                 </div>
+
                 <div class="sm:col-span-2">
                     <label class="block text-sm text-gray-700">Nombre</label>
-                    <input name="nombre" required class="w-full border rounded px-3 py-2"
-                           placeholder="Nombre descriptivo">
+                    <input
+                        name="nombre"
+                        required
+                        class="w-full border rounded px-3 py-2"
+                        placeholder="Nombre descriptivo"
+                    >
                 </div>
 
                 <div class="sm:col-span-3">
@@ -90,6 +109,11 @@
         {{-- Tipos de proceso --}}
         <section x-show="tab==='tipo_proceso'" x-cloak>
             <x-listado-parametro titulo="Tipos de proceso" :items="$tiposProceso" entidad="tipo_proceso" />
+        </section>
+
+        {{-- ✅ NUEVO: CIIU --}}
+        <section x-show="tab==='ciiu'" x-cloak>
+            <x-listado-parametro titulo="CIIU" :items="$ciius" entidad="ciiu" />
         </section>
     </div>
 </div>

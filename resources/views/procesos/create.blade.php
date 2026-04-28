@@ -437,24 +437,28 @@
             });
         });
     </script>
-    <script>
-        document.addEventListener('click', function(e) {
-            const btn = e.target.closest('.btn-detalle');
-            if (!btn) return;
+   <script>
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.btn-detalle');
+        if (!btn) return;
 
-            const codigo = btn.dataset.codigo || '';
-            const objeto = btn.dataset.objeto || '';
-            const valor = btn.dataset.valor || '';
-            const estado = btn.dataset.estado || '';
-            const fecha = btn.dataset.fecha || '';
-            const secop = btn.dataset.secop || '';
+        const codigo = btn.dataset.codigo || '';
+        const objeto = btn.dataset.objeto || '';
+        const valor = btn.dataset.valor || '';
+        const estado = btn.dataset.estado || '';
+        const fecha = btn.dataset.fecha || '';
+        const secop = (btn.dataset.secop || '').trim();
 
-            const urlSecop =
-                `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(secop)}`;
+        let urlSecop = '';
+        if (/^https?:\/\//i.test(secop)) {
+            urlSecop = secop;
+        } else if (secop) {
+            urlSecop = `https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=${encodeURIComponent(secop)}`;
+        }
 
-            Swal.fire({
-                title: `<div class="text-left font-semibold text-gray-800">Proceso ${codigo}</div>`,
-                html: `
+        Swal.fire({
+            title: `<div class="text-left font-semibold text-gray-800">Proceso ${codigo}</div>`,
+            html: `
       <div class="text-left">
         <table class="w-full mb-5 text-sm">
           <tbody>
@@ -485,24 +489,24 @@
         </div>
       </div>
     `,
-                showConfirmButton: true,
-                confirmButtonText: 'Ver en SECOP',
-                confirmButtonColor: '#16a34a',
-                showCloseButton: true,
-                focusConfirm: false,
-                width: 700,
-                customClass: {
-                    popup: 'rounded-2xl',
-                    confirmButton: 'px-4 py-2 rounded-lg',
-                    closeButton: 'text-gray-500 hover:text-gray-700'
-                }
-            }).then((res) => {
-                if (res.isConfirmed && secop) {
-                    window.open(urlSecop, '_blank', 'noopener,noreferrer');
-                }
-            });
+            showConfirmButton: true,
+            confirmButtonText: 'Ver en SECOP',
+            confirmButtonColor: '#16a34a',
+            showCloseButton: true,
+            focusConfirm: false,
+            width: 700,
+            customClass: {
+                popup: 'rounded-2xl',
+                confirmButton: 'px-4 py-2 rounded-lg',
+                closeButton: 'text-gray-500 hover:text-gray-700'
+            }
+        }).then((res) => {
+            if (res.isConfirmed && urlSecop) {
+                window.open(urlSecop, '_blank', 'noopener,noreferrer');
+            }
         });
-    </script>
+    });
+</script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const tabla = document.getElementById('tablaProcesos');
