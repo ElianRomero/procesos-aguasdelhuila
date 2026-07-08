@@ -37,8 +37,12 @@ return [
 
     'wompi' => [
         'base_url' => env('WOMPI_BASE_URL', 'https://production.wompi.co'),
+        'checkout_url' => env('WOMPI_CHECKOUT_URL', 'https://checkout.wompi.co/p/'),
         'private_key' => env('WOMPI_PRIVATE_KEY'), 
         'public_key' => env('WOMPI_PUBLIC_KEY'),
+        'integrity_secret' => env('WOMPI_INTEGRITY_SECRET'),
+        'currency' => env('WOMPI_CURRENCY', 'COP'),
+        'redirect_url' => env('WOMPI_REDIRECT_URL'),
         'events_secret' => env('WOMPI_EVENTS_SECRET'),
     ],
 

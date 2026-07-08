@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminPostulacionesDocsController;
 use App\Http\Controllers\EmbedController;
 use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\InvoiceCheckoutTestController;
 use App\Http\Controllers\InvoicePaymenttController;
 use App\Http\Controllers\NoticiaController;
 use App\Http\Controllers\ProponentesCertificadosController;
@@ -306,6 +307,12 @@ Route::get('/pago/buscar', [InvoicePaymentController::class, 'searchForm'])->nam
 Route::get('/pago', [InvoicePaymentController::class, 'search'])->name('pago.search'); // ?refpago=123
 Route::get('/pago/{refpago}', [InvoicePaymentController::class, 'show'])->name('pago.show');
 Route::post('/pago/{refpago}/link', [InvoicePaymentController::class, 'createOrReuseLink'])->name('pago.link');
+
+// Flujo de pruebas: Checkout Web con URL referenciada
+Route::get('/pago-checkout-pruebas/buscar', [InvoiceCheckoutTestController::class, 'searchForm'])->name('pago.checkout.search.form');
+Route::get('/pago-checkout-pruebas', [InvoiceCheckoutTestController::class, 'search'])->name('pago.checkout.search');
+Route::get('/pago-checkout-pruebas/{refpago}', [InvoiceCheckoutTestController::class, 'show'])->name('pago.checkout.show');
+Route::post('/pago-checkout-pruebas/{refpago}/link', [InvoiceCheckoutTestController::class, 'createCheckoutUrl'])->name('pago.checkout.link');
 
 // Webhook Wompi:
 Route::post('/webhook/wompi', [InvoicePaymentController::class, 'webhook'])

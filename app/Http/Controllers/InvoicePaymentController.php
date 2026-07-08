@@ -70,11 +70,11 @@ class InvoicePaymentController extends Controller
         $invoice = Invoice::where('refpago', $refpago)->firstOrFail();
 
         if ($invoice->status === 'pagada') {
-            return back()->with('ok', 'Esta factura ya fue pagada. °Gracias!');
+            return back()->with('ok', 'Esta factura ya fue pagada. ¬°Gracias!');
         }
 
         if ($this->invoiceExpired($invoice)) {
-            return back()->with('error', 'Esta factura est· vencida y ya no se puede pagar.');
+            return back()->with('error', 'Esta factura est√° vencida y ya no se puede pagar.');
         }
 
         if ($invoice->valfactura <= 0) {
@@ -126,7 +126,7 @@ class InvoicePaymentController extends Controller
                         ? implode(' | ', collect($msgs)->flatten()->all())
                         : ($msgs ?: '');
 
-                    return back()->with('error', $flat ?: 'Error de validaciÛn con Wompi.');
+                    return back()->with('error', $flat ?: 'Error de validaci√≥n con Wompi.');
                 }
 
                 Log::error('Wompi payment_link error', [
@@ -155,12 +155,12 @@ class InvoicePaymentController extends Controller
             $health = Http::timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
 
             if (!$health->successful() || !data_get($health->json(), 'data.active')) {
-                Log::error('Wompi: link reciÈn creado inactivo', [
+                Log::error('Wompi: link reci√©n creado inactivo', [
                     'id' => $id,
                     'body' => $health->json(),
                 ]);
 
-                return back()->with('error', 'El enlace no quedÛ activo. Intenta de nuevo.');
+                return back()->with('error', 'El enlace no qued√≥ activo. Intenta de nuevo.');
             }
 
             $invoice->update([
@@ -174,7 +174,7 @@ class InvoicePaymentController extends Controller
             return redirect()->away('https://checkout.wompi.co/l/' . $id);
 
         } catch (\Throwable $e) {
-            Log::error('ExcepciÛn Wompi', ['e' => $e->getMessage()]);
+            Log::error('Excepci√≥n Wompi', ['e' => $e->getMessage()]);
             return back()->with('error', 'Error interno al generar el enlace de pago.');
         }
     }
@@ -189,9 +189,9 @@ class InvoicePaymentController extends Controller
 
         if (!$sigOk) {
             if (app()->environment(['local', 'development', 'testing'])) {
-                Log::info('SIGDEBUG: firma inv·lida pero omitida en local/dev/testing');
+                Log::info('SIGDEBUG: firma inv√°lida pero omitida en local/dev/testing');
             } else {
-                Log::info('SIGDEBUG: firma inv·lida en producciÛn, abortando');
+                Log::info('SIGDEBUG: firma inv√°lida en producci√≥n, abortando');
                 return response('invalid signature', 400);
             }
         }
@@ -310,6 +310,10 @@ class InvoicePaymentController extends Controller
         $status = strtoupper((string) data_get($tx, 'status', ''));
         $sandboxStatus = strtoupper((string) data_get($tx, 'payment_method.sandbox_status', ''));
         $finalizedAt = data_get($tx, 'finalized_at');
+
+        if (in_array($status, ['DECLINED', 'VOIDED', 'ERROR'], true)) {
+            return false;
+        }
 
         return $status === 'APPROVED'
             || ($sandboxStatus === 'APPROVED' && !empty($finalizedAt));
