@@ -294,6 +294,8 @@ Route::middleware(['auth'])->group(function () {
 
 
 Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
+Route::get('/embed/procesos/{proceso:codigo}', [EmbedController::class, 'show'])->name('embed.procesos.show');
+Route::get('/embed/procesos/{proceso:codigo}', [EmbedController::class, 'show'])->name('embed.procesos.show');
 
 
 

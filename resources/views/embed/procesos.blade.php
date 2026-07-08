@@ -151,8 +151,10 @@
           orderable: false,
           searchable: false,
           className: 'dt-center',
-          render: function () {
-            return `<a class="btn btn-primary" href="https://procesos.aguasdelhuila.gov.co/login" target="_blank" rel="noopener">Ir</a>`;
+          render: function (_, __, row) {
+            const templateUrl = @json(route('embed.procesos.show', ['proceso' => '__CODIGO__']));
+            const detalleUrl = templateUrl.replace('__CODIGO__', encodeURIComponent(row.codigo));
+            return `<a class="btn btn-primary" href="${detalleUrl}" target="_blank" rel="noopener">Ver</a>`;
           }
         },
       ],

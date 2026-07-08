@@ -6,10 +6,11 @@ use App\Models\Proceso;
 use App\Models\TipoProceso;
 use App\Models\EstadoContrato;
 use App\Models\TipoContrato;
+use Illuminate\Http\Response;
 
 class EmbedController extends Controller
 {
-     public function index()
+    public function index()
     {
         $tiposProceso  = TipoProceso::orderBy('nombre')->pluck('nombre')->all();
         $estados       = EstadoContrato::orderBy('nombre')->pluck('nombre')->all();
@@ -39,6 +40,20 @@ class EmbedController extends Controller
 
         $view = view('embed.procesos', compact('tiposProceso','estados','tiposContrato','anios','meses'));
 
+        return $this->frameResponse($view);
+    }
+
+    public function show(Proceso $proceso)
+    {
+        $proceso->load(['tipoProceso', 'estadoContrato', 'tipoContrato']);
+
+        $view = view('embed.procesos-show', compact('proceso'));
+
+        return $this->frameResponse($view);
+    }
+
+    protected function frameResponse($view): Response
+    {
         return response($view)
             ->header('Content-Security-Policy', "frame-ancestors 'self' https://aguasdelhuila.gov.co https://www.aguasdelhuila.gov.co https://*.aguasdelhuila.gov.co");
     }
