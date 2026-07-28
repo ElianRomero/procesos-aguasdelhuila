@@ -81,16 +81,6 @@ class InvoicePaymentController extends Controller
             return back()->with('error', 'Esta factura tiene saldo cero o negativo. No es cobrable.');
         }
 
-        // Reutilizar enlace activo si ya existe
-        if (
-            $invoice->payment_link_url &&
-            $invoice->expires_at &&
-            now()->lt($invoice->expires_at) &&
-            $invoice->status === 'pendiente'
-        ) {
-            return redirect()->away($invoice->payment_link_url);
-        }
-
         $wompiBase = rtrim(config('services.wompi.base_url', 'https://sandbox.wompi.co'), '/');
         $privateKey = config('services.wompi.private_key');
         $currency = 'COP';
@@ -347,7 +337,7 @@ class InvoicePaymentController extends Controller
 
     private function extractRefpagoFromReference(string $ref): ?string
     {
-        if (preg_match('/^INV-(.+)-[A-Z0-9]+$/', $ref, $m)) {
+        if (preg_match('/^(?:INV|FACTURA)-(.+)-[A-Z0-9]+$/', $ref, $m)) {
             return $m[1];
         }
 

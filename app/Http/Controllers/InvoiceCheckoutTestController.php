@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class InvoiceCheckoutTestController extends Controller
 {
@@ -53,16 +54,6 @@ class InvoiceCheckoutTestController extends Controller
 
         if ($invoice->valfactura <= 0) {
             return back()->with('error', 'Esta factura tiene saldo cero o negativo. No es cobrable.');
-        }
-
-        if (
-            $invoice->payment_link_url &&
-            $invoice->expires_at &&
-            now()->lt($invoice->expires_at) &&
-            $invoice->status === 'pendiente' &&
-            str_contains($invoice->payment_link_url, 'checkout.wompi.co/p/')
-        ) {
-            return redirect()->away($invoice->payment_link_url);
         }
 
         $publicKey = (string) config('services.wompi.public_key', '');
@@ -165,7 +156,7 @@ class InvoiceCheckoutTestController extends Controller
 
     private function buildPaymentReference(Invoice $invoice): string
     {
-        return 'FACTURA-' . $invoice->refpago . '-' . now()->utc()->timestamp;
+        return 'FACTURA-' . $invoice->refpago . '-' . Str::upper(Str::random(10));
     }
 
     private function resolveCustomerEmail(Invoice $invoice): ?string
