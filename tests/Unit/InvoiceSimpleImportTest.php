@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Invoice;
+use App\Models\SimpleInvoice;
 use App\Models\User;
 use App\Services\InvoiceSimpleImportService;
 use Illuminate\Database\Schema\Blueprint;
@@ -35,6 +36,27 @@ beforeEach(function () {
         $table->unsignedBigInteger('valfactura');
         $table->date('fecha')->nullable();
         $table->string('nombre')->nullable();
+        $table->string('direccion')->nullable();
+        $table->string('status')->default('pendiente');
+        $table->text('payment_link_url')->nullable();
+        $table->timestamp('expires_at')->nullable();
+        $table->string('wompi_reference')->nullable();
+        $table->string('wompi_link_id')->nullable();
+        $table->string('wompi_transaction_id')->nullable();
+        $table->string('wompi_status')->nullable();
+        $table->unsignedBigInteger('wompi_amount_in_cents')->nullable();
+        $table->timestamp('paid_at')->nullable();
+        $table->timestamps();
+    });
+
+    Schema::create('simple_invoices', function (Blueprint $table) {
+        $table->id();
+        $table->string('numero')->index();
+        $table->string('codigo')->index();
+        $table->string('refpago')->unique();
+        $table->unsignedBigInteger('valfactura');
+        $table->date('fecha');
+        $table->string('nombre');
         $table->string('direccion')->nullable();
         $table->string('status')->default('pendiente');
         $table->text('payment_link_url')->nullable();
@@ -138,7 +160,7 @@ test('preview reads CSV aliases without saving invoices', function (string $head
 
     expect($response->viewData('summary')['new'])->toBe(1)
         ->and($response->viewData('rows')[0]['refpago'])->toBe('6761067')
-        ->and(Invoice::count())->toBe(0);
+        ->and(SimpleInvoice::count())->toBe(0);
 })->with(['REFERNCIA', 'REFERENCIA', 'REFPAGO', 'referencia_de_pago' => 'referencia']);
 
 test('preview reads XLSX files', function () {
@@ -182,7 +204,7 @@ test('confirmation creates a normalized invoice that is available publicly', fun
     $confirm->assertOk()
         ->assertViewIs('invoices.import-simple-result');
 
-    $invoice = Invoice::where('refpago', '6761067')->firstOrFail();
+    $invoice = SimpleInvoice::where('refpago', '6761067')->firstOrFail();
 
     expect($invoice->numero)->toBe('00123')
         ->and($invoice->codigo)->toBe('00123')
@@ -193,14 +215,56 @@ test('confirmation creates a normalized invoice that is available publicly', fun
         ->and($invoice->wompi_reference)->toBeNull()
         ->and($invoice->paid_at)->toBeNull();
 
+    $this->get(route('pago.search', ['refpago' => '6761067']))
+        ->assertRedirect(route('pago.show', ['refpago' => '6761067']));
+
     $this->get(route('pago.show', ['refpago' => '6761067']))
         ->assertOk()
-        ->assertViewHas('invoice', fn (Invoice $found) => $found->is($invoice));
+        ->assertSee('Pagar ahora')
+        ->assertViewHas('invoice', fn (SimpleInvoice $found) => $found->is($invoice));
+});
+
+test('a traditional invoice with the same reference does not block the simplified invoice', function () {
+    $traditional = Invoice::create([
+        'numero' => '7504928',
+        'codigo' => '14405762',
+        'refpago' => '6761067',
+        'valfactura' => 15650,
+        'fecha' => now()->subDays(3),
+        'nombre' => 'Factura tradicional',
+        'status' => 'pendiente',
+    ]);
+    $original = $traditional->fresh()->getAttributes();
+
+    $preview = $this->actingAs(simpleImportUser())
+        ->post(route('invoices.simple-import.preview'), [
+            'file' => simpleImportCsv(),
+            'fecha_limite' => now()->addDays(5)->toDateString(),
+        ]);
+
+    expect($preview->viewData('summary')['new'])->toBe(1);
+
+    $this->post(route('invoices.simple-import.confirm'), [
+        'token' => $preview->viewData('token'),
+    ])->assertOk();
+
+    expect(SimpleInvoice::where('refpago', '6761067')->value('valfactura'))->toBe(40150)
+        ->and($traditional->fresh()->getAttributes())->toBe($original)
+        ->and(Invoice::count())->toBe(1)
+        ->and(SimpleInvoice::count())->toBe(1);
+
+    $this->get(route('pago.show', ['refpago' => '6761067']))
+        ->assertOk()
+        ->assertViewHas(
+            'invoice',
+            fn (SimpleInvoice $found) => $found->refpago === '6761067'
+                && (int) $found->valfactura === 40150
+        );
 });
 
 test('existing and paid invoices are never modified', function () {
     $paidAt = now()->subDay();
-    $existing = Invoice::create([
+    $existing = SimpleInvoice::create([
         'numero' => 'ORIGINAL',
         'codigo' => 'ORIGINAL',
         'refpago' => '6761067',
@@ -231,7 +295,40 @@ test('existing and paid invoices are never modified', function () {
     ])->assertOk();
 
     expect($existing->fresh()->getAttributes())->toBe($original)
-        ->and(Invoice::count())->toBe(1);
+        ->and(SimpleInvoice::count())->toBe(1);
+});
+
+test('Wompi webhook updates the simplified invoice selected by its reference prefix', function () {
+    $invoice = SimpleInvoice::create([
+        'numero' => '7911062',
+        'codigo' => '7911062',
+        'refpago' => '7911062',
+        'valfactura' => 2000,
+        'fecha' => now()->addDays(3),
+        'nombre' => 'Plaza de ferias',
+        'status' => 'pendiente',
+        'wompi_reference' => 'CODIGO-7911062-ABC123XYZ9',
+    ]);
+
+    $payload = [
+        'event' => 'transaction.updated',
+        'data' => [
+            'transaction' => [
+                'id' => 'TX-SIMPLE-1',
+                'status' => 'APPROVED',
+                'amount_in_cents' => 200000,
+                'reference' => 'CODIGO-7911062-ABC123XYZ9',
+                'finalized_at' => now()->toIso8601String(),
+            ],
+        ],
+    ];
+
+    $this->postJson('/webhook/wompi', $payload)->assertOk();
+
+    expect($invoice->fresh()->status)->toBe('pagada')
+        ->and($invoice->fresh()->wompi_status)->toBe('APPROVED')
+        ->and($invoice->fresh()->wompi_transaction_id)->toBe('TX-SIMPLE-1')
+        ->and($invoice->fresh()->paid_at)->not->toBeNull();
 });
 
 test('duplicates and invalid rows do not stop valid rows', function () {
@@ -257,9 +354,9 @@ test('duplicates and invalid rows do not stop valid rows', function () {
         'token' => $preview->viewData('token'),
     ])->assertOk();
 
-    expect(Invoice::count())->toBe(2)
-        ->and(Invoice::where('refpago', '7001')->value('valfactura'))->toBe(40150)
-        ->and(Invoice::where('refpago', '7004')->value('valfactura'))->toBe(1250000);
+    expect(SimpleInvoice::count())->toBe(2)
+        ->and(SimpleInvoice::where('refpago', '7001')->value('valfactura'))->toBe(40150)
+        ->and(SimpleInvoice::where('refpago', '7004')->value('valfactura'))->toBe(1250000);
 });
 
 test('confirmation rechecks references and cannot reuse a token', function () {
@@ -271,11 +368,13 @@ test('confirmation rechecks references and cannot reuse a token', function () {
         ]);
     $token = $preview->viewData('token');
 
-    Invoice::create([
+    SimpleInvoice::create([
         'numero' => 'RACE',
         'codigo' => 'RACE',
         'refpago' => '6761067',
         'valfactura' => 100,
+        'fecha' => now()->addDay(),
+        'nombre' => 'Creada durante la confirmacion',
         'status' => 'pendiente',
     ]);
 
@@ -283,7 +382,7 @@ test('confirmation rechecks references and cannot reuse a token', function () {
     $first->assertOk();
 
     expect($first->viewData('result')['duplicates'])->toBe(1)
-        ->and(Invoice::count())->toBe(1);
+        ->and(SimpleInvoice::count())->toBe(1);
 
     $this->post(route('invoices.simple-import.confirm'), ['token' => $token])
         ->assertRedirect(route('invoices.simple-import.form'));
@@ -297,7 +396,7 @@ test('past payment dates are rejected', function () {
         ])
         ->assertSessionHasErrors('fecha_limite');
 
-    expect(Invoice::count())->toBe(0);
+    expect(SimpleInvoice::count())->toBe(0);
 });
 
 test('formula values are not evaluated or imported', function () {
@@ -311,7 +410,7 @@ test('formula values are not evaluated or imported', function () {
 
     expect($response->viewData('summary')['invalid'])->toBe(1)
         ->and($response->viewData('summary')['new'])->toBe(0)
-        ->and(Invoice::count())->toBe(0);
+        ->and(SimpleInvoice::count())->toBe(0);
 });
 
 test('ambiguous equivalent headers are rejected', function () {
@@ -328,7 +427,7 @@ test('ambiguous equivalent headers are rejected', function () {
         ->assertRedirect()
         ->assertSessionHas('error');
 
-    expect(Invoice::count())->toBe(0);
+    expect(SimpleInvoice::count())->toBe(0);
 });
 
 test('normalizes identifiers and Colombian money formats', function (mixed $input, string $expected) {

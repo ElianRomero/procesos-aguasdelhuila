@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Invoice;
+use App\Models\SimpleInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -30,7 +31,7 @@ class InvoicePaymentController extends Controller
 
     public function show(string $refpago)
     {
-        $invoice = Invoice::where('refpago', $refpago)->first();
+        $invoice = $this->findInvoiceByRefpago($refpago);
 
         if (! $invoice) {
             return view('payments.not-found', compact('refpago'));
@@ -41,7 +42,13 @@ class InvoicePaymentController extends Controller
         return view('payments.show', compact('invoice', 'vencida'));
     }
 
-    private function invoiceExpired(Invoice $invoice): bool
+    private function findInvoiceByRefpago(string $refpago): Invoice|SimpleInvoice|null
+    {
+        return SimpleInvoice::where('refpago', $refpago)->first()
+            ?? Invoice::where('refpago', $refpago)->first();
+    }
+
+    private function invoiceExpired(Invoice|SimpleInvoice $invoice): bool
     {
         if (! $invoice->fecha) {
             return false;
@@ -67,7 +74,9 @@ class InvoicePaymentController extends Controller
 
     public function createOrReuseLink(Request $request, string $refpago)
     {
-        $invoice = Invoice::where('refpago', $refpago)->firstOrFail();
+        $invoice = $this->findInvoiceByRefpago($refpago);
+
+        abort_if(! $invoice, 404);
 
         if ($invoice->status === 'pagada') {
             return back()->with('ok', 'Esta factura ya fue pagada. ¡Gracias!');
@@ -84,10 +93,14 @@ class InvoicePaymentController extends Controller
         $publicKey = (string) config('services.wompi.public_key', '');
         $integritySecret = (string) config('services.wompi.integrity_secret', '');
         $currency = (string) config('services.wompi.currency', 'COP');
-        $redirectUrl = (string) (
-            config('services.wompi.redirect_url')
-            ?: route('pago.show', ['refpago' => $invoice->refpago])
-        );
+        $redirectUrl = route('pago.show', ['refpago' => $invoice->refpago]);
+
+        if ($invoice instanceof Invoice) {
+            $redirectUrl = (string) (
+                config('services.wompi.redirect_url')
+                ?: $redirectUrl
+            );
+        }
         $checkoutBase = rtrim(
             (string) config('services.wompi.checkout_url', 'https://checkout.wompi.co/p/'),
             '/'
@@ -301,10 +314,26 @@ class InvoicePaymentController extends Controller
             || ($sandboxStatus === 'APPROVED' && ! empty($finalizedAt));
     }
 
-    private function findInvoiceFromTx(array $tx): ?Invoice
+    private function findInvoiceFromTx(array $tx): Invoice|SimpleInvoice|null
     {
         $plinkId = data_get($tx, 'payment_link_id');
         $txRef = (string) data_get($tx, 'reference', '');
+
+        if ($plinkId) {
+            if ($invoice = SimpleInvoice::where('wompi_link_id', $plinkId)->first()) {
+                return $invoice;
+            }
+        }
+
+        if (preg_match('/^(?:CODIGO|CODLINK)-/', $txRef)) {
+            if ($invoice = SimpleInvoice::where('wompi_reference', $txRef)->first()) {
+                return $invoice;
+            }
+
+            if ($refpago = $this->extractSimpleRefpagoFromReference($txRef)) {
+                return SimpleInvoice::where('refpago', $refpago)->first();
+            }
+        }
 
         if ($plinkId) {
             if ($inv = Invoice::where('wompi_link_id', $plinkId)->first()) {
@@ -322,6 +351,15 @@ class InvoicePaymentController extends Controller
             if ($inv = Invoice::where('refpago', $refpago)->first()) {
                 return $inv;
             }
+        }
+
+        return null;
+    }
+
+    private function extractSimpleRefpagoFromReference(string $ref): ?string
+    {
+        if (preg_match('/^(?:CODIGO|CODLINK)-(.+)-[A-Z0-9]+$/', $ref, $matches)) {
+            return $matches[1];
         }
 
         return null;
@@ -356,12 +394,14 @@ class InvoicePaymentController extends Controller
         );
     }
 
-    private function buildPaymentReference(Invoice $invoice): string
+    private function buildPaymentReference(Invoice|SimpleInvoice $invoice): string
     {
-        return 'FACTURA-'.$invoice->refpago.'-'.Str::upper(Str::random(10));
+        $prefix = $invoice instanceof SimpleInvoice ? 'CODIGO' : 'FACTURA';
+
+        return $prefix.'-'.$invoice->refpago.'-'.Str::upper(Str::random(10));
     }
 
-    private function createLegacyPaymentLink(Invoice $invoice)
+    private function createLegacyPaymentLink(Invoice|SimpleInvoice $invoice)
     {
         $wompiBase = rtrim(
             (string) config('services.wompi.base_url', 'https://sandbox.wompi.co'),
@@ -369,7 +409,8 @@ class InvoicePaymentController extends Controller
         );
         $privateKey = (string) config('services.wompi.private_key', '');
         $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
-        $reference = 'INV-'.$invoice->refpago.'-'.Str::upper(Str::random(6));
+        $prefix = $invoice instanceof SimpleInvoice ? 'CODLINK' : 'INV';
+        $reference = $prefix.'-'.$invoice->refpago.'-'.Str::upper(Str::random(6));
         $amountInCents = (int) $invoice->valfactura * 100;
 
         $payload = [
@@ -437,14 +478,14 @@ class InvoicePaymentController extends Controller
         }
     }
 
-    private function resolveCustomerEmail(Invoice $invoice): ?string
+    private function resolveCustomerEmail(Invoice|SimpleInvoice $invoice): ?string
     {
         return filter_var($invoice->direccion, FILTER_VALIDATE_EMAIL)
             ? $invoice->direccion
             : null;
     }
 
-    private function resolveCustomerPhone(Invoice $invoice): ?string
+    private function resolveCustomerPhone(Invoice|SimpleInvoice $invoice): ?string
     {
         if (! $invoice->direccion) {
             return null;

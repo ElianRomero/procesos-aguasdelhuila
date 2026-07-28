@@ -2,27 +2,22 @@
 
 use App\Http\Controllers\AdminExpedientesController;
 use App\Http\Controllers\AdminPostulacionesController;
-use App\Http\Controllers\AdminPostulacionesDocsController;
 use App\Http\Controllers\EmbedController;
-use App\Http\Controllers\InvoiceImportController;
-use App\Http\Controllers\InvoiceSimpleImportController;
-use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\InvoiceCheckoutTestController;
-use App\Http\Controllers\InvoicePaymenttController;
+use App\Http\Controllers\InvoiceImportController;
+use App\Http\Controllers\InvoicePaymentController;
+use App\Http\Controllers\InvoiceSimpleImportController;
 use App\Http\Controllers\NoticiaController;
-use App\Http\Controllers\ProponentesCertificadosController;
 use App\Http\Controllers\ObservacionController;
 use App\Http\Controllers\ParametrosContratoController;
+use App\Http\Controllers\PostulacionController;
 use App\Http\Controllers\ProcesoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProponenteController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PostulacionController;
-use App\Http\Controllers\VentanasObservacionesController;
-use Illuminate\Http\Request;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use App\Http\Controllers\ProponentesCertificadosController;
 use App\Http\Controllers\ProponentesOldController;
-
+use App\Http\Controllers\VentanasObservacionesController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -48,8 +43,6 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
     Route::post('/postulaciones/{codigo}', [PostulacionController::class, 'store'])
         ->name('postulaciones.store');
 
-
-
     Route::delete('/procesos/{codigo}/postulaciones/{proponente}', [PostulacionController::class, 'destroy'])->name('postulaciones.destroy');
 
     Route::get('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosForm'])
@@ -60,7 +53,6 @@ Route::middleware(['auth', 'can:isProponente'])->group(function () {
 
     Route::post('/postulaciones/{codigo}/archivos', [PostulacionController::class, 'archivosStore'])
         ->name('postulaciones.archivos.store');
-
 
     Route::get('/postulaciones/{codigo}/archivos/{key}', [PostulacionController::class, 'archivoShow'])
         ->name('postulaciones.archivos.show');
@@ -95,7 +87,6 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/admin/proponentes/{proponente}', [AdminPostulacionesController::class, 'show'])
         ->name('proponentes.show');
 
-
     Route::get('/procesos/{proceso:codigo}/observaciones', [ObservacionController::class, 'index'])
         ->name('procesos.observaciones.index');
 
@@ -105,13 +96,11 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
     Route::get('/observaciones/ventanas', [VentanasObservacionesController::class, 'index'])
         ->name('observaciones.ventanas.index');
 
-
     Route::put('/procesos/{proceso:codigo}/observaciones/ventana', [VentanasObservacionesController::class, 'update'])
         ->name('observaciones.ventanas.update');
 
     Route::patch('/observaciones/{observacion}/estado', [ObservacionController::class, 'actualizarEstado'])
         ->name('observaciones.actualizarEstado');
-
 
     Route::prefix('admin/parametros')->name('parametros.')->group(function () {
         Route::get('/', [ParametrosContratoController::class, 'index'])->name('index');
@@ -120,7 +109,6 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
         Route::delete('/{entidad}/{id}', [ParametrosContratoController::class, 'destroy'])->name('destroy');
     });
 });
-
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/procesos/{proceso:codigo}/observaciones/nueva', [ObservacionController::class, 'create'])
@@ -135,7 +123,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/mis-observaciones', [ObservacionController::class, 'myIndex'])
         ->name('mis.observaciones.index');
 
-
     Route::get('/observaciones/{observacion}/editar', [ObservacionController::class, 'edit'])
         ->name('observaciones.edit');
 
@@ -145,9 +132,6 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/observaciones/{observacion}/archivos/{archivo}', [ObservacionController::class, 'destroyArchivo'])
         ->name('observaciones.archivos.destroy');
 });
-
-
-
 
 /*
  |— VerNoticias-----------------------------------------------------------------------------------------------------------------------------
@@ -205,7 +189,6 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 
 });
 
-
 Route::middleware(['auth', 'can:isContratacion'])->group(function () {
     Route::get('/admin/facturas/importar', [InvoiceImportController::class, 'form'])->name('invoices.import.form');
     Route::post('/admin/facturas/importar', [InvoiceImportController::class, 'import'])->name('invoices.import');
@@ -215,11 +198,11 @@ Route::middleware(['auth', 'can:isContratacion'])->group(function () {
         ->name('invoices.simple-import.preview');
     Route::post('/admin/facturas/importar-codigos/confirmar', [InvoiceSimpleImportController::class, 'confirm'])
         ->name('invoices.simple-import.confirm');
+    Route::get('/facturas-codigos', [InvoiceSimpleImportController::class, 'index'])
+        ->name('invoices.simple.index');
     Route::get('/facturas', [InvoiceImportController::class, 'index'])->name('invoices.index');
 
 });
-
-
 
 Route::middleware(['auth', 'can:isProponente'])->group(function () {
     Route::get('/mi/noticias', [NoticiaController::class, 'misNoticias'])
@@ -277,10 +260,7 @@ Route::middleware(['auth', 'can:isAdmin'])->prefix('backoffice')->group(function
         ->middleware('signed')
         ->name('bo.expedientes.stream');
 
-
-
 });
-
 
 /*
  |—-----------------------------------------------------------------------------------------------------------------------------
@@ -297,25 +277,23 @@ Route::middleware(['auth'])->group(function () {
         ->name('proponentes.certificados.download');
 });
 
-
-
-
 Route::get('/embed/procesos', [EmbedController::class, 'index'])->name('embed.procesos');
 Route::get('/embed/procesos/{proceso:codigo}', [EmbedController::class, 'show'])->name('embed.procesos.show');
 Route::get('/embed/procesos/{proceso:codigo}', [EmbedController::class, 'show'])->name('embed.procesos.show');
 
-
-
 /*
  |—Pasarela de pagos WOMPI-----------------------------------------------------------------------------------------------------------------------------
 */
-
 
 // Público / cliente:
 Route::get('/pago/buscar', [InvoicePaymentController::class, 'searchForm'])->name('pago.search.form');
 Route::get('/pago', [InvoicePaymentController::class, 'search'])->name('pago.search'); // ?refpago=123
 Route::get('/pago/{refpago}', [InvoicePaymentController::class, 'show'])->name('pago.show');
 Route::post('/pago/{refpago}/link', [InvoicePaymentController::class, 'createOrReuseLink'])->name('pago.link');
+Route::get('/pago-codigos/{refpago}', [InvoicePaymentController::class, 'show'])
+    ->name('pago.simple.show');
+Route::post('/pago-codigos/{refpago}/link', [InvoicePaymentController::class, 'createOrReuseLink'])
+    ->name('pago.simple.link');
 
 // Flujo de pruebas: Checkout Web con URL referenciada
 Route::get('/pago-checkout-pruebas/buscar', [InvoiceCheckoutTestController::class, 'searchForm'])->name('pago.checkout.search.form');
@@ -327,5 +305,4 @@ Route::post('/pago-checkout-pruebas/{refpago}/link', [InvoiceCheckoutTestControl
 Route::post('/webhook/wompi', [InvoicePaymentController::class, 'webhook'])
     ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
 
-
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

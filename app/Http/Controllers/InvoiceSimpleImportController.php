@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\InvoiceSimpleImportConfirmRequest;
 use App\Http\Requests\InvoiceSimpleImportPreviewRequest;
+use App\Models\SimpleInvoice;
 use App\Services\InvoiceSimpleImportService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -16,6 +17,13 @@ class InvoiceSimpleImportController extends Controller
     public function form()
     {
         return view('invoices.import-simple');
+    }
+
+    public function index()
+    {
+        $invoices = SimpleInvoice::orderByDesc('id')->get();
+
+        return view('invoices.simple-index', compact('invoices'));
     }
 
     public function preview(

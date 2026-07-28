@@ -9,6 +9,13 @@
             <p class="text-sm text-black mt-1">Carga facturas nuevas mediante CODIGO, NOMBRE, REFERNCIA y VALOR.</p>
         </div>
 
+        <div class="flex justify-end">
+            <a href="{{ route('invoices.simple.index') }}"
+                class="inline-flex items-center px-4 py-2.5 rounded-lg border border-black bg-white text-sm font-semibold text-black hover:bg-slate-100">
+                Ver facturas simplificadas
+            </a>
+        </div>
+
         @if (session('error'))
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-black">
                 {{ session('error') }}

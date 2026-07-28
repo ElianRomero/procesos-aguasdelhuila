@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\Invoice;
+use App\Models\SimpleInvoice;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
@@ -93,7 +93,7 @@ class InvoiceSimpleImportService
         ];
 
         foreach ((array) ($batch['valid_rows'] ?? []) as $row) {
-            $existing = Invoice::where('refpago', $row['refpago'])->first();
+            $existing = SimpleInvoice::where('refpago', $row['refpago'])->first();
 
             if ($existing) {
                 if ($existing->status === 'pagada'
@@ -107,7 +107,7 @@ class InvoiceSimpleImportService
             }
 
             try {
-                $invoice = Invoice::create([
+                $invoice = SimpleInvoice::create([
                     'numero' => $row['numero'],
                     'codigo' => $row['codigo'],
                     'refpago' => $row['refpago'],
@@ -286,10 +286,10 @@ class InvoiceSimpleImportService
         $existing = [];
 
         foreach (array_chunk($references, 1000) as $chunk) {
-            Invoice::query()
+            SimpleInvoice::query()
                 ->whereIn('refpago', $chunk)
                 ->get(['id', 'refpago', 'status', 'wompi_status'])
-                ->each(function (Invoice $invoice) use (&$existing): void {
+                ->each(function (SimpleInvoice $invoice) use (&$existing): void {
                     $existing[$invoice->refpago] = $invoice;
                 });
         }
