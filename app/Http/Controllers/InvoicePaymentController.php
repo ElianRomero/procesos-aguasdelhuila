@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class InvoicePaymentController extends Controller
@@ -20,7 +20,7 @@ class InvoicePaymentController extends Controller
     {
         $ref = trim((string) $request->query('refpago'));
 
-        if (!$ref) {
+        if (! $ref) {
             return redirect()->route('pago.search.form')
                 ->with('error', 'Ingresa un REFPAGO');
         }
@@ -32,7 +32,7 @@ class InvoicePaymentController extends Controller
     {
         $invoice = Invoice::where('refpago', $refpago)->first();
 
-        if (!$invoice) {
+        if (! $invoice) {
             return view('payments.not-found', compact('refpago'));
         }
 
@@ -43,7 +43,7 @@ class InvoicePaymentController extends Controller
 
     private function invoiceExpired(Invoice $invoice): bool
     {
-        if (!$invoice->fecha) {
+        if (! $invoice->fecha) {
             return false;
         }
 
@@ -55,7 +55,7 @@ class InvoicePaymentController extends Controller
         $s = $s ?? '';
         $s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $s);
 
-        if (!mb_check_encoding($s, 'UTF-8')) {
+        if (! mb_check_encoding($s, 'UTF-8')) {
             $s = @mb_convert_encoding($s, 'UTF-8', 'Windows-1252, ISO-8859-1, UTF-8');
         }
 
@@ -81,92 +81,81 @@ class InvoicePaymentController extends Controller
             return back()->with('error', 'Esta factura tiene saldo cero o negativo. No es cobrable.');
         }
 
-        $wompiBase = rtrim(config('services.wompi.base_url', 'https://sandbox.wompi.co'), '/');
-        $privateKey = config('services.wompi.private_key');
-        $currency = 'COP';
+        $publicKey = (string) config('services.wompi.public_key', '');
+        $integritySecret = (string) config('services.wompi.integrity_secret', '');
+        $currency = (string) config('services.wompi.currency', 'COP');
+        $redirectUrl = (string) (
+            config('services.wompi.redirect_url')
+            ?: route('pago.show', ['refpago' => $invoice->refpago])
+        );
+        $checkoutBase = rtrim(
+            (string) config('services.wompi.checkout_url', 'https://checkout.wompi.co/p/'),
+            '/'
+        );
 
-        $name = $this->cleanStr("Pago factura " . $invoice->refpago, 64);
-        $description = $this->cleanStr("Factura " . $invoice->refpago, 180);
-        $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
-        $reference = 'INV-' . $invoice->refpago . '-' . Str::upper(Str::random(6));
-
-        $payload = [
-            'name' => $name,
-            'description' => $description,
-            'single_use' => true,
-            'collect_shipping' => false,
-            'currency' => $currency,
-            'amount_in_cents' => (int) $invoice->valfactura * 100,
-            'reference' => $reference,
-            'expires_at' => $expiresAtUtc,
-            'redirect_url' => route('pago.show', ['refpago' => $invoice->refpago]),
-        ];
-
-        try {
-            $resp = Http::withToken($privateKey)
-                ->acceptJson()
-                ->asJson()
-                ->timeout(15)
-                ->post($wompiBase . '/v1/payment_links', $payload);
-
-            if (!$resp->successful()) {
-                if (in_array($resp->status(), [409, 422])) {
-                    $msgs = data_get($resp->json(), 'error.messages', []);
-                    $flat = is_array($msgs)
-                        ? implode(' | ', collect($msgs)->flatten()->all())
-                        : ($msgs ?: '');
-
-                    return back()->with('error', $flat ?: 'Error de validación con Wompi.');
-                }
-
-                Log::error('Wompi payment_link error', [
-                    'status' => $resp->status(),
-                    'body' => $resp->json(),
-                ]);
-
-                return back()->with('error', 'No fue posible generar el enlace de pago.');
-            }
-
-            $data = $resp->json();
-            $id = data_get($data, 'data.id');
-
-            if (!$id) {
-                Log::error('Wompi: respuesta sin id', ['data' => $data]);
-                return back()->with('error', 'No fue posible generar el enlace de pago.');
-            }
-
-            Log::info('Wompi link creado', [
-                'refpago' => $invoice->refpago,
-                'wompi_link_id' => $id,
-                'wompi_reference' => $reference,
-                'amount_in_cents' => (int) $invoice->valfactura,
+        if (! $this->hasValidCheckoutConfig($publicKey, $integritySecret, $currency)) {
+            Log::warning('Wompi Checkout sin configurar; usando link de pago', [
+                'has_public_key' => $publicKey !== '',
+                'has_integrity_secret' => $integritySecret !== '',
+                'currency' => $currency,
             ]);
 
-            $health = Http::timeout(10)->get($wompiBase . '/v1/payment_links/' . $id);
-
-            if (!$health->successful() || !data_get($health->json(), 'data.active')) {
-                Log::error('Wompi: link recién creado inactivo', [
-                    'id' => $id,
-                    'body' => $health->json(),
-                ]);
-
-                return back()->with('error', 'El enlace no quedó activo. Intenta de nuevo.');
-            }
-
-            $invoice->update([
-                'payment_link_url' => 'https://checkout.wompi.co/l/' . $id,
-                'wompi_link_id' => $id,
-                'expires_at' => Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
-                'wompi_reference' => $reference,
-                'status' => 'pendiente',
-            ]);
-
-            return redirect()->away('https://checkout.wompi.co/l/' . $id);
-
-        } catch (\Throwable $e) {
-            Log::error('Excepción Wompi', ['e' => $e->getMessage()]);
-            return back()->with('error', 'Error interno al generar el enlace de pago.');
+            return $this->createLegacyPaymentLink($invoice);
         }
+
+        $amountInCents = (int) $invoice->valfactura * 100;
+        $reference = $this->buildPaymentReference($invoice);
+        $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
+        $signature = hash(
+            'sha256',
+            $reference.$amountInCents.$currency.$expiresAtUtc.$integritySecret
+        );
+
+        $params = array_filter([
+            'public-key' => $publicKey,
+            'currency' => $currency,
+            'amount-in-cents' => $amountInCents,
+            'reference' => $reference,
+            'signature:integrity' => $signature,
+            'redirect-url' => $redirectUrl,
+            'expiration-time' => $expiresAtUtc,
+            'customer-data:email' => $this->resolveCustomerEmail($invoice),
+            'customer-data:full-name' => $this->cleanStr(
+                $invoice->nombre ?: ('Pagador factura '.$invoice->refpago),
+                80
+            ),
+            'customer-data:phone-number' => $this->resolveCustomerPhone($invoice),
+            'customer-data:legal-id' => $invoice->codigo ?: null,
+            'customer-data:legal-id-type' => $invoice->codigo ? 'CC' : null,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        $checkoutUrl = $checkoutBase.'/?'.http_build_query(
+            $params,
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
+
+        $invoice->update([
+            'payment_link_url' => $checkoutUrl,
+            'wompi_link_id' => null,
+            'wompi_reference' => $reference,
+            'wompi_amount_in_cents' => $amountInCents,
+            'wompi_status' => null,
+            'wompi_transaction_id' => null,
+            'expires_at' => Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
+            'status' => 'pendiente',
+        ]);
+
+        Log::info('Wompi checkout url creada', [
+            'invoice_id' => $invoice->id,
+            'refpago' => $invoice->refpago,
+            'wompi_reference' => $reference,
+            'amount_in_cents' => $amountInCents,
+            'expires_at' => $expiresAtUtc,
+        ]);
+
+        return redirect()->away($checkoutUrl);
     }
 
     public function webhook(Request $request)
@@ -177,17 +166,19 @@ class InvoicePaymentController extends Controller
 
         $sigOk = $this->verifyWompiSignature($request, $payload);
 
-        if (!$sigOk) {
+        if (! $sigOk) {
             if (app()->environment(['local', 'development', 'testing'])) {
                 Log::info('SIGDEBUG: firma inválida pero omitida en local/dev/testing');
             } else {
                 Log::info('SIGDEBUG: firma inválida en producción, abortando');
+
                 return response('invalid signature', 400);
             }
         }
 
         if (data_get($payload, 'event') !== 'transaction.updated') {
             Log::info('SIGDEBUG: evento ignorado', ['event' => data_get($payload, 'event')]);
+
             return response('ignored', 200);
         }
 
@@ -209,11 +200,12 @@ class InvoicePaymentController extends Controller
 
         $invoice = $this->findInvoiceFromTx($tx);
 
-        if (!$invoice) {
+        if (! $invoice) {
             Log::info('Webhook: invoice not found', [
                 'payment_link_id' => $plinkId,
                 'reference' => $txRef,
             ]);
+
             return response('ok', 200);
         }
 
@@ -221,7 +213,7 @@ class InvoicePaymentController extends Controller
             return response('ok', 200);
         }
 
-        if ($approved && $invoice->status === 'pagada') {
+        if ($invoice->status === 'pagada') {
             return response('ok', 200);
         }
 
@@ -273,20 +265,20 @@ class InvoicePaymentController extends Controller
             }
         }
 
-        if (empty($secret) || !is_array($props) || $timestamp === null || $timestamp === '') {
+        if (empty($secret) || ! is_array($props) || $timestamp === null || $timestamp === '') {
             return false;
         }
 
         $concat = '';
         foreach ($props as $path) {
-            $val = data_get($payload, 'data.' . $path);
+            $val = data_get($payload, 'data.'.$path);
             if ($val === null) {
                 return false;
             }
             $concat .= (string) $val;
         }
 
-        $concat .= (string) $timestamp . $secret;
+        $concat .= (string) $timestamp.$secret;
 
         $computed = strtoupper(hash('sha256', $concat));
         $hdrUp = strtoupper($hdr);
@@ -306,7 +298,7 @@ class InvoicePaymentController extends Controller
         }
 
         return $status === 'APPROVED'
-            || ($sandboxStatus === 'APPROVED' && !empty($finalizedAt));
+            || ($sandboxStatus === 'APPROVED' && ! empty($finalizedAt));
     }
 
     private function findInvoiceFromTx(array $tx): ?Invoice
@@ -342,5 +334,124 @@ class InvoicePaymentController extends Controller
         }
 
         return null;
+    }
+
+    private function hasValidCheckoutConfig(
+        string $publicKey,
+        string $integritySecret,
+        string $currency
+    ): bool {
+        if ($publicKey === '' || $integritySecret === '' || $currency === '') {
+            return false;
+        }
+
+        $isTestPublic = str_starts_with($publicKey, 'pub_test_');
+        $isProdPublic = str_starts_with($publicKey, 'pub_prod_');
+        $isTestIntegrity = str_starts_with($integritySecret, 'test_integrity_');
+        $isProdIntegrity = str_starts_with($integritySecret, 'prod_integrity_');
+
+        return ! (
+            ($isTestPublic && ! $isTestIntegrity)
+            || ($isProdPublic && ! $isProdIntegrity)
+        );
+    }
+
+    private function buildPaymentReference(Invoice $invoice): string
+    {
+        return 'FACTURA-'.$invoice->refpago.'-'.Str::upper(Str::random(10));
+    }
+
+    private function createLegacyPaymentLink(Invoice $invoice)
+    {
+        $wompiBase = rtrim(
+            (string) config('services.wompi.base_url', 'https://sandbox.wompi.co'),
+            '/'
+        );
+        $privateKey = (string) config('services.wompi.private_key', '');
+        $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
+        $reference = 'INV-'.$invoice->refpago.'-'.Str::upper(Str::random(6));
+        $amountInCents = (int) $invoice->valfactura * 100;
+
+        $payload = [
+            'name' => $this->cleanStr('Pago factura '.$invoice->refpago, 64),
+            'description' => $this->cleanStr('Factura '.$invoice->refpago, 180),
+            'single_use' => true,
+            'collect_shipping' => false,
+            'currency' => 'COP',
+            'amount_in_cents' => $amountInCents,
+            'reference' => $reference,
+            'expires_at' => $expiresAtUtc,
+            'redirect_url' => route('pago.show', ['refpago' => $invoice->refpago]),
+        ];
+
+        try {
+            $response = Http::withToken($privateKey)
+                ->acceptJson()
+                ->asJson()
+                ->timeout(15)
+                ->post($wompiBase.'/v1/payment_links', $payload);
+
+            if (! $response->successful()) {
+                Log::error('Wompi payment_link error', [
+                    'status' => $response->status(),
+                    'body' => $response->json(),
+                ]);
+
+                return back()->with('error', 'No fue posible generar el enlace de pago.');
+            }
+
+            $id = data_get($response->json(), 'data.id');
+
+            if (! $id) {
+                Log::error('Wompi: respuesta sin id', ['data' => $response->json()]);
+
+                return back()->with('error', 'No fue posible generar el enlace de pago.');
+            }
+
+            $health = Http::timeout(10)->get($wompiBase.'/v1/payment_links/'.$id);
+
+            if (! $health->successful() || ! data_get($health->json(), 'data.active')) {
+                Log::error('Wompi: link recien creado inactivo', [
+                    'id' => $id,
+                    'body' => $health->json(),
+                ]);
+
+                return back()->with('error', 'El enlace no quedo activo. Intenta de nuevo.');
+            }
+
+            $paymentUrl = 'https://checkout.wompi.co/l/'.$id;
+
+            $invoice->update([
+                'payment_link_url' => $paymentUrl,
+                'wompi_link_id' => $id,
+                'expires_at' => Carbon::parse($expiresAtUtc)->setTimezone(config('app.timezone')),
+                'wompi_reference' => $reference,
+                'status' => 'pendiente',
+            ]);
+
+            return redirect()->away($paymentUrl);
+        } catch (\Throwable $exception) {
+            Log::error('Excepcion Wompi', ['e' => $exception->getMessage()]);
+
+            return back()->with('error', 'Error interno al generar el enlace de pago.');
+        }
+    }
+
+    private function resolveCustomerEmail(Invoice $invoice): ?string
+    {
+        return filter_var($invoice->direccion, FILTER_VALIDATE_EMAIL)
+            ? $invoice->direccion
+            : null;
+    }
+
+    private function resolveCustomerPhone(Invoice $invoice): ?string
+    {
+        if (! $invoice->direccion) {
+            return null;
+        }
+
+        preg_match('/(\+?\d[\d\s]{6,})/', $invoice->direccion, $matches);
+
+        return $matches[1] ?? null;
     }
 }
