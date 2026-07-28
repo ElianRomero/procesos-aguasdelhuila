@@ -325,11 +325,13 @@ class InvoicePaymentController extends Controller
             }
         }
 
-        if (preg_match('/^(?:CODIGO|CODLINK)-/', $txRef)) {
+        if ($txRef) {
             if ($invoice = SimpleInvoice::where('wompi_reference', $txRef)->first()) {
                 return $invoice;
             }
+        }
 
+        if (preg_match('/^(?:CODIGO|CODLINK)-/', $txRef)) {
             if ($refpago = $this->extractSimpleRefpagoFromReference($txRef)) {
                 return SimpleInvoice::where('refpago', $refpago)->first();
             }
@@ -396,9 +398,11 @@ class InvoicePaymentController extends Controller
 
     private function buildPaymentReference(Invoice|SimpleInvoice $invoice): string
     {
-        $prefix = $invoice instanceof SimpleInvoice ? 'CODIGO' : 'FACTURA';
+        if ($invoice instanceof SimpleInvoice) {
+            return (string) $invoice->refpago;
+        }
 
-        return $prefix.'-'.$invoice->refpago.'-'.Str::upper(Str::random(10));
+        return 'FACTURA-'.$invoice->refpago.'-'.Str::upper(Str::random(10));
     }
 
     private function createLegacyPaymentLink(Invoice|SimpleInvoice $invoice)
@@ -409,8 +413,9 @@ class InvoicePaymentController extends Controller
         );
         $privateKey = (string) config('services.wompi.private_key', '');
         $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
-        $prefix = $invoice instanceof SimpleInvoice ? 'CODLINK' : 'INV';
-        $reference = $prefix.'-'.$invoice->refpago.'-'.Str::upper(Str::random(6));
+        $reference = $invoice instanceof SimpleInvoice
+            ? (string) $invoice->refpago
+            : 'INV-'.$invoice->refpago.'-'.Str::upper(Str::random(6));
         $amountInCents = (int) $invoice->valfactura * 100;
 
         $payload = [

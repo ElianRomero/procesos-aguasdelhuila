@@ -3,6 +3,7 @@
 use App\Http\Controllers\InvoiceCheckoutTestController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Models\Invoice;
+use App\Models\SimpleInvoice;
 
 test('checkout creates a different reference for every payment attempt', function () {
     $invoice = new Invoice(['refpago' => '6761061']);
@@ -28,6 +29,13 @@ test('public payment creates a recognizable and unique reference for every attem
     expect($first)
         ->toMatch('/^FACTURA-4833-[A-Z0-9]{10}$/')
         ->not->toBe($second);
+});
+
+test('simplified payment sends only refpago as the Wompi reference', function () {
+    $invoice = new SimpleInvoice(['refpago' => '111122']);
+    $method = new ReflectionMethod(InvoicePaymentController::class, 'buildPaymentReference');
+
+    expect($method->invoke(new InvoicePaymentController, $invoice))->toBe('111122');
 });
 
 test('public checkout only activates with matching Wompi environments', function () {

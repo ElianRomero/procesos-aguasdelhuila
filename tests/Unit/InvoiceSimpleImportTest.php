@@ -298,7 +298,7 @@ test('existing and paid invoices are never modified', function () {
         ->and(SimpleInvoice::count())->toBe(1);
 });
 
-test('Wompi webhook updates the simplified invoice selected by its reference prefix', function () {
+test('Wompi webhook updates the simplified invoice selected by its exact payment reference', function () {
     $invoice = SimpleInvoice::create([
         'numero' => '7911062',
         'codigo' => '7911062',
@@ -307,7 +307,7 @@ test('Wompi webhook updates the simplified invoice selected by its reference pre
         'fecha' => now()->addDays(3),
         'nombre' => 'Plaza de ferias',
         'status' => 'pendiente',
-        'wompi_reference' => 'CODIGO-7911062-ABC123XYZ9',
+        'wompi_reference' => '7911062',
     ]);
 
     $payload = [
@@ -317,7 +317,7 @@ test('Wompi webhook updates the simplified invoice selected by its reference pre
                 'id' => 'TX-SIMPLE-1',
                 'status' => 'APPROVED',
                 'amount_in_cents' => 200000,
-                'reference' => 'CODIGO-7911062-ABC123XYZ9',
+                'reference' => '7911062',
                 'finalized_at' => now()->toIso8601String(),
             ],
         ],
