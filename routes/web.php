@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminPostulacionesController;
 use App\Http\Controllers\AdminPostulacionesDocsController;
 use App\Http\Controllers\EmbedController;
 use App\Http\Controllers\InvoiceImportController;
+use App\Http\Controllers\InvoiceSimpleImportController;
 use App\Http\Controllers\InvoicePaymentController;
 use App\Http\Controllers\InvoiceCheckoutTestController;
 use App\Http\Controllers\InvoicePaymenttController;
@@ -208,7 +209,13 @@ Route::middleware(['auth', 'can:isAdmin'])->group(function () {
 Route::middleware(['auth', 'can:isContratacion'])->group(function () {
     Route::get('/admin/facturas/importar', [InvoiceImportController::class, 'form'])->name('invoices.import.form');
     Route::post('/admin/facturas/importar', [InvoiceImportController::class, 'import'])->name('invoices.import');
-        Route::get('/facturas', [InvoiceImportController::class, 'index'])->name('invoices.index');
+    Route::get('/admin/facturas/importar-codigos', [InvoiceSimpleImportController::class, 'form'])
+        ->name('invoices.simple-import.form');
+    Route::post('/admin/facturas/importar-codigos/previsualizar', [InvoiceSimpleImportController::class, 'preview'])
+        ->name('invoices.simple-import.preview');
+    Route::post('/admin/facturas/importar-codigos/confirmar', [InvoiceSimpleImportController::class, 'confirm'])
+        ->name('invoices.simple-import.confirm');
+    Route::get('/facturas', [InvoiceImportController::class, 'index'])->name('invoices.index');
 
 });
 
