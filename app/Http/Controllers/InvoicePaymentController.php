@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class InvoicePaymentController extends Controller
 {
@@ -398,11 +397,7 @@ class InvoicePaymentController extends Controller
 
     private function buildPaymentReference(Invoice|SimpleInvoice $invoice): string
     {
-        if ($invoice instanceof SimpleInvoice) {
-            return (string) $invoice->refpago;
-        }
-
-        return 'FACTURA-'.$invoice->refpago.'-'.Str::upper(Str::random(10));
+        return (string) $invoice->refpago;
     }
 
     private function createLegacyPaymentLink(Invoice|SimpleInvoice $invoice)
@@ -413,9 +408,7 @@ class InvoicePaymentController extends Controller
         );
         $privateKey = (string) config('services.wompi.private_key', '');
         $expiresAtUtc = now()->utc()->addMinutes(30)->toIso8601String();
-        $reference = $invoice instanceof SimpleInvoice
-            ? (string) $invoice->refpago
-            : 'INV-'.$invoice->refpago.'-'.Str::upper(Str::random(6));
+        $reference = $this->buildPaymentReference($invoice);
         $amountInCents = (int) $invoice->valfactura * 100;
 
         $payload = [

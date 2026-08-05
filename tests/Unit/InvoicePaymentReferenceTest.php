@@ -5,30 +5,18 @@ use App\Http\Controllers\InvoicePaymentController;
 use App\Models\Invoice;
 use App\Models\SimpleInvoice;
 
-test('checkout creates a different reference for every payment attempt', function () {
+test('checkout sends only refpago as the Wompi reference', function () {
     $invoice = new Invoice(['refpago' => '6761061']);
     $method = new ReflectionMethod(InvoiceCheckoutTestController::class, 'buildPaymentReference');
-    $controller = new InvoiceCheckoutTestController;
 
-    $first = $method->invoke($controller, $invoice);
-    $second = $method->invoke($controller, $invoice);
-
-    expect($first)
-        ->toMatch('/^FACTURA-6761061-[A-Z0-9]{10}$/')
-        ->not->toBe($second);
+    expect($method->invoke(new InvoiceCheckoutTestController, $invoice))->toBe('6761061');
 });
 
-test('public payment creates a recognizable and unique reference for every attempt', function () {
-    $invoice = new Invoice(['refpago' => '4833']);
+test('public payment sends only refpago as the Wompi reference', function () {
+    $invoice = new Invoice(['refpago' => '791696']);
     $method = new ReflectionMethod(InvoicePaymentController::class, 'buildPaymentReference');
-    $controller = new InvoicePaymentController;
 
-    $first = $method->invoke($controller, $invoice);
-    $second = $method->invoke($controller, $invoice);
-
-    expect($first)
-        ->toMatch('/^FACTURA-4833-[A-Z0-9]{10}$/')
-        ->not->toBe($second);
+    expect($method->invoke(new InvoicePaymentController, $invoice))->toBe('791696');
 });
 
 test('simplified payment sends only refpago as the Wompi reference', function () {

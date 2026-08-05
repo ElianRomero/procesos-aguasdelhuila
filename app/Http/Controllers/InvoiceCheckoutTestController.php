@@ -6,7 +6,6 @@ use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class InvoiceCheckoutTestController extends Controller
 {
@@ -156,7 +155,7 @@ class InvoiceCheckoutTestController extends Controller
 
     private function buildPaymentReference(Invoice $invoice): string
     {
-        return 'FACTURA-' . $invoice->refpago . '-' . Str::upper(Str::random(10));
+        return (string) $invoice->refpago;
     }
 
     private function resolveCustomerEmail(Invoice $invoice): ?string
